@@ -17,7 +17,7 @@ library(plotly)
 server <- function(input, output, session) {
   
   
-  ######################################################### FASE INPUT DATI  #########################################################
+######################################################### FASE INPUT DATI  #########################################################
   
   
   selected_folder <- reactiveVal(NULL)
@@ -37,7 +37,6 @@ server <- function(input, output, session) {
       })
     } else {
       showNotification("Resampling non necessario", type = "error")
-      
     }
   })
   
@@ -52,14 +51,10 @@ server <- function(input, output, session) {
     if (is.null(inFile)) {
       showNotification("File non caricato.", type = "error")
     } else {
-   
-    
       data <- read.table(inFile$datapath, sep = "\t", header = TRUE, stringsAsFactors = FALSE)
       
       #### Bulk singola biopsia
       if (ncol(data) == 3) {
-        
-
         output$dataFile2 <- renderUI({
            fileInput("dataFile2", "Resampling")
         })
@@ -69,20 +64,23 @@ server <- function(input, output, session) {
         })
         
         data <- distinct(data, SAMPLE, GENE, .keep_all = TRUE)
-
         reshaped_data <- acast(data, SAMPLE ~ GENE, value.var = "CCF", fill = 0)
-        
-
+       
         output$SelectColumn <- renderUI({
             selectInput("SelectColumn", "Select column", choices=colnames(reshaped_data), multiple=T)
         })
 
+        observe({
+          
+          if (length(input$SelectColumn) > 0) {
+              reshaped_data <- as.data.frame(reshaped_data)
+              reshaped_data <- reshaped_data %>% select(!!!rlang::syms(input$SelectColumn))
+          }
+        
           output$dataTable <- renderDT({
-            reshaped_data <- as.data.frame(reshaped_data)
-            reshaped_data <- reshaped_data %>% select(!!!rlang::syms(input$SelectColumn))
+              datatable(reshaped_data, options = list(scrollX = TRUE))
           })
 
-          
           #rappresenta heatmap con possibilità di fare zoom
           output$heatmapPlot <- renderPlotly({
               heatmap_plot <- plot_ly(
@@ -104,15 +102,15 @@ server <- function(input, output, session) {
               
               return(heatmap_plot)
           })
+        })
           
-          # Funzionalità di cliccare su un paziente
-          non_zero_values <- reactiveVal(character(0))
+        # Funzionalità di cliccare su un paziente
+        non_zero_values <- reactiveVal(character(0))
           
-          observeEvent(input$dataTable_cell_clicked, {
-            info <- input$dataTable_cell_clicked
+        observeEvent(input$dataTable_cell_clicked, {
+          info <- input$dataTable_cell_clicked
             
-            if (!is.null(info)) {
-              
+          if (!is.null(info)) {
               row_index <- info$row
               selected_genes <- names(which(reshaped_data[row_index, ] != 0))
               
@@ -141,39 +139,38 @@ server <- function(input, output, session) {
                   )
                 } 
               })
-            }
-          })
+          }
+        })
       } else if (ncol(data) == 4){        #### Bulk multipla biopsia o single cell 
         if (colnames(data)[2]=="REGION") {
           output$dataFile2 <- renderUI({})
           output$loadBtn2 <- renderUI({})
           
-           # Rimuovere duplicati mantenendo solo la prima occorrenza per ciascuna posizione
-           data <- distinct(data, SAMPLE, REGION, GENE, .keep_all = TRUE)
+          # Rimuovere duplicati mantenendo solo la prima occorrenza per ciascuna posizione
+          data <- distinct(data, SAMPLE, REGION, GENE, .keep_all = TRUE)
            
-           observeEvent(input$colFilter, {
-             # se il dataset è stato filtrato per colonna seleziona solo quelle indicate dall'utente
-             if (!is.null(input$colFilter) && input$colFilter != "") {
-               reshaped_data <- data %>%
-                 group_by(SAMPLE, REGION, GENE) %>%
-                 summarise(CCF = sum(CCF)) %>%
-                 unite("ID", c("SAMPLE", "REGION"), sep = " ") %>%
-                 pivot_wider(names_from = GENE, values_from = CCF, values_fill = 0) %>%
-                 select(ID, matches(input$colFilter))
-             } else {
-               reshaped_data <- data %>%
-                 group_by(SAMPLE, REGION, GENE) %>%
-                 summarise(CCF = sum(CCF)) %>%
-                 unite("ID", c("SAMPLE", "REGION"), sep = " ") %>%
-                 pivot_wider(names_from = GENE, values_from = CCF, values_fill = 0) %>%
-                 select(ID, everything())
-             }
-             
-            
+
+          reshaped_data <- data %>%
+            group_by(SAMPLE, REGION, GENE) %>%
+            summarise(CCF = sum(CCF)) %>%
+            unite("ID", c("SAMPLE", "REGION"), sep = " ") %>%
+            pivot_wider(names_from = GENE, values_from = CCF, values_fill = 0) %>%
+            select(ID, everything())
+
+          output$SelectColumn <- renderUI({
+            selectInput("SelectColumn", "Select column", choices=colnames(reshaped_data), multiple=T)
+          })
+               
+          observe({
+            if (length(input$SelectColumn) > 0) {
+              reshaped_data <- as.data.frame(reshaped_data)
+              reshaped_data <- reshaped_data %>% select(!!!rlang::syms(input$SelectColumn))
+            }
+                 
             output$dataTable <- renderDT({
               datatable(reshaped_data, options = list(scrollX = TRUE))
             })
-            
+
             
             output$heatmapPlot <- renderPlotly({
               if (ncol(data) == 4) {
@@ -197,109 +194,109 @@ server <- function(input, output, session) {
                 return(heatmap_plot)
               }
             })
+          })
             
-            observeEvent(input$dataTable_cell_clicked, {
-              info <- input$dataTable_cell_clicked
+          observeEvent(input$dataTable_cell_clicked, {
+            info <- input$dataTable_cell_clicked
               
-              if (!is.null(info) && !is.null(info$row) && !is.null(info$col)) {
-                row_index <- info$row
-                selected_id <- as.character(strsplit(as.character(reshaped_data[row_index, "ID"]), " ")[[1]][1])
+            if (!is.null(info) && !is.null(info$row) && !is.null(info$col)) {
+              row_index <- info$row
+              selected_id <- as.character(strsplit(as.character(reshaped_data[row_index, "ID"]), " ")[[1]][1])
                 
-                req(input$dir)
-                selected_folder <- parseDirPath(c(wd = getwd()), input$dir)
-                file_to_search <- paste0(selected_id, ".txt")
-                file_path <- file.path(selected_folder, file_to_search)
-                file_data <- read.table(file_path, header = TRUE, stringsAsFactors = FALSE, sep = "\t")
-                
-                col_names <- colnames(file_data)
-                
-                file_data$ID <- col_names
-                
-                file_data <- file_data[, c("ID", setdiff(col_names, "ID"))]
-                
-                output$content <- renderUI({
-                  tagList(
-                    tags$hr(),
-                    plotOutput("graphPlot") 
-                  )
-                })
-                
-                output$fileDataTable <- renderDT({
-                  datatable(file_data, options = list(scrollX = TRUE))
-                })
-                
-                graph_data <- reshape2::melt(file_data, id.vars = "ID")
-                edges <- graph_data[graph_data$value != 0, c("ID", "variable")]
-                
-                graph <- graph_from_data_frame(edges, directed = TRUE)
-                
-                output$graphPlot <- renderPlot({
-                  plot(graph, edge.label = edges$value, layout = layout.reingold.tilford)
-                })
-              }
-            })
-            
-            output$directoryInput <- renderUI({
-              shinyDirButton("dir", "Seleziona una cartella", title = "Seleziona una cartella", multiple = FALSE)
-            })
-            
-            observe({
               req(input$dir)
-              selected_folder(parseDirPath(c(wd = getwd()), input$dir))
-            })
+              selected_folder <- parseDirPath(c(wd = getwd()), input$dir)
+              file_to_search <- paste0(selected_id, ".txt")
+              file_path <- file.path(selected_folder, file_to_search)
+              file_data <- read.table(file_path, header = TRUE, stringsAsFactors = FALSE, sep = "\t")
+                
+              col_names <- colnames(file_data)
+                
+              file_data$ID <- col_names
+                
+              file_data <- file_data[, c("ID", setdiff(col_names, "ID"))]
+                
+              output$content <- renderUI({
+                tagList(
+                  tags$hr(),
+                  plotOutput("graphPlot") 
+                )
+              })
+                
+              output$fileDataTable <- renderDT({
+                datatable(file_data, options = list(scrollX = TRUE))
+              })
+                
+              graph_data <- reshape2::melt(file_data, id.vars = "ID")
+              edges <- graph_data[graph_data$value != 0, c("ID", "variable")]
+                
+              graph <- graph_from_data_frame(edges, directed = TRUE)
+                
+              output$graphPlot <- renderPlot({
+                plot(graph, edge.label = edges$value, layout = layout.reingold.tilford)
+              })
+            }
+          })
             
-            shinyDirChoose(input, "dir", roots = c(wd = getwd()), filetypes = c("", "txt"))
+          output$directoryInput <- renderUI({
+            shinyDirButton("dir", "Seleziona una cartella", title = "Seleziona una cartella", multiple = FALSE)
+          })
             
-           })
-        }
-        else if (colnames(data)[2]=="CELL")
-        {
+          observe({
+            req(input$dir)
+            selected_folder(parseDirPath(c(wd = getwd()), input$dir))
+          })
+            
+          shinyDirChoose(input, "dir", roots = c(wd = getwd()), filetypes = c("", "txt"))
+            
+
+        } else if (colnames(data)[2]=="CELL") {
           # Rimuovere duplicati mantenendo solo la prima occorrenza per ciascuna posizione
           data <- distinct(data, PATIENT, CELL, GENE, .keep_all = TRUE)
           
-          observeEvent(input$colFilter, {
-            # se il dataset è stato filtrato per colonna seleziona solo quelle indicate dall'utente
-            if (!is.null(input$colFilter) && input$colFilter != "") {
-              reshaped_data <- data %>%
-                group_by(PATIENT, CELL, GENE) %>%
-                summarise(VALUE = sum(VALUE)) %>%
-                unite("ID", c("PATIENT", "CELL"), sep = " ") %>%
-                pivot_wider(names_from = GENE, values_from = VALUE, values_fill = 0) %>%
-                select(ID, matches(input$colFilter))
-            } else {
-              reshaped_data <- data %>%
-                group_by(PATIENT, GENE) %>%
-                summarise(PERCENTAGE = mean(VALUE) * 100) %>%
-                pivot_wider(names_from = GENE, values_from = PERCENTAGE, values_fill = list(PERCENTAGE = 0))
-              
-            }
+
+          reshaped_data <- data %>%
+            group_by(PATIENT, GENE) %>%
+            summarise(PERCENTAGE = mean(VALUE) * 100) %>%
+            pivot_wider(names_from = GENE, values_from = PERCENTAGE, values_fill = list(PERCENTAGE = 0))
             
-            output$dataTable <- renderDT({
-              datatable(reshaped_data, options = list(scrollX = TRUE))
+            output$SelectColumn <- renderUI({
+              selectInput("SelectColumn", "Select column", choices=colnames(reshaped_data), multiple=T)
             })
-            
-            
-            output$heatmapPlot <- renderPlotly({
-              if (ncol(data) == 4) {
-                heatmap_plot <- plot_ly(
-                  z = as.matrix(reshaped_data),
-                  x = colnames(reshaped_data),
-                  y = rownames(reshaped_data),
-                  type = "heatmap"
-                ) %>%
-                  layout(
-                    margin = list(l = 50, r = 50, b = 50, t = 50),
-                    xaxis = list(side = "bottom"),
-                    yaxis = list(autorange = "reversed")
-                  )
+              
+            observe({
                 
-                # zoom
-                heatmap_plot <- heatmap_plot %>%
-                  config(displayModeBar = TRUE) %>%
-                  layout(dragmode = "select")
-                
-                return(heatmap_plot)
+              if (length(input$SelectColumn) > 0) {
+                reshaped_data <- as.data.frame(reshaped_data)
+                reshaped_data <- reshaped_data %>% select(!!!rlang::syms(input$SelectColumn))
               }
+                
+              output$dataTable <- renderDT({
+                datatable(reshaped_data, options = list(scrollX = TRUE))
+              })
+            
+            
+              output$heatmapPlot <- renderPlotly({
+                if (ncol(data) == 4) {
+                  heatmap_plot <- plot_ly(
+                    z = as.matrix(reshaped_data),
+                    x = colnames(reshaped_data),
+                    y = rownames(reshaped_data),
+                    type = "heatmap"
+                  ) %>%
+                    layout(
+                      margin = list(l = 50, r = 50, b = 50, t = 50),
+                      xaxis = list(side = "bottom"),
+                      yaxis = list(autorange = "reversed")
+                    )
+                  
+                  # zoom
+                  heatmap_plot <- heatmap_plot %>%
+                    config(displayModeBar = TRUE) %>%
+                    layout(dragmode = "select")
+                  
+                  return(heatmap_plot)
+                }
+              })
             })
             
             observeEvent(input$dataTable_cell_clicked, {
@@ -358,9 +355,7 @@ server <- function(input, output, session) {
             })
             
             shinyDirChoose(input, "dir", roots = c(wd = getwd()), filetypes = c("", "txt"))
-            
-          })
-          
+
         }
         else {
           showNotification("File non riconosciuto. Assicurati che il nome delle colonne sia corretto.", type = "error")

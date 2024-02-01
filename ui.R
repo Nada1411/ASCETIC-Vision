@@ -124,7 +124,6 @@ shinyUI(
                ),
                conditionalPanel(
                  condition = "input.switchViewBtn % 2 == 1",
-                 textInput("colFilter", "Search column:"),
                  DTOutput("dataTable")
                ),
                conditionalPanel(
