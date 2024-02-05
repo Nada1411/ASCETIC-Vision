@@ -114,8 +114,15 @@ shinyUI(
                           uiOutput("directoryInput")
                         )
                  ),
-                 
-                 uiOutput("SelectColumn"),
+                 fluidRow(
+                   column(6,
+                          uiOutput("SelectColumn"),
+                   ),
+                   column(6,
+                          uiOutput("DeleteColumn"),
+                   ),
+                 ),
+                 uiOutput("DeleteRow"),
                ),
                DTOutput("dataTable2"),
                conditionalPanel(

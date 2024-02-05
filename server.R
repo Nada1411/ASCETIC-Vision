@@ -69,13 +69,40 @@ server <- function(input, output, session) {
         output$SelectColumn <- renderUI({
             selectInput("SelectColumn", "Select column", choices=colnames(reshaped_data), multiple=T)
         })
+        
+        output$DeleteColumn <- renderUI({
+          selectInput("DeleteColumn", "Delete column", choices=colnames(reshaped_data), multiple=T)
+        })
+        
+        output$DeleteRow <- renderUI({
+          selectInput("DeleteRow", "Delete row", choices=row.names(reshaped_data), multiple=T)
+        })
+        
+        # Funzionalità di cliccare su un paziente
+        non_zero_values <- reactiveVal(character(0))
 
         observe({
           
           if (length(input$SelectColumn) > 0) {
               reshaped_data <- as.data.frame(reshaped_data)
               reshaped_data <- reshaped_data %>% select(!!!rlang::syms(input$SelectColumn))
+              reshaped_data <- as.matrix(reshaped_data)
           }
+          
+          if (length(input$DeleteColumn) > 0) {
+            reshaped_data <- as.data.frame(reshaped_data)
+            reshaped_data <- reshaped_data %>%
+              select(-all_of(input$DeleteColumn))
+            reshaped_data <- as.matrix(reshaped_data)
+          }
+          
+          if (length(input$DeleteRow) > 0) {
+            reshaped_data <- as.data.frame(reshaped_data)
+            reshaped_data <- reshaped_data %>%
+              slice(-which(rownames(reshaped_data) %in% input$DeleteRow))
+            reshaped_data <- as.matrix(reshaped_data)
+          }
+          
         
           output$dataTable <- renderDT({
               datatable(reshaped_data, options = list(scrollX = TRUE))
@@ -102,44 +129,43 @@ server <- function(input, output, session) {
               
               return(heatmap_plot)
           })
-        })
-          
-        # Funzionalità di cliccare su un paziente
-        non_zero_values <- reactiveVal(character(0))
-          
-        observeEvent(input$dataTable_cell_clicked, {
-          info <- input$dataTable_cell_clicked
+
             
-          if (!is.null(info)) {
-              row_index <- info$row
-              selected_genes <- names(which(reshaped_data[row_index, ] != 0))
-              
-              # Declare poset_graph outside of the if block
-              poset_graph <- NULL
-              
-              if (length(selected_genes) >= 2) {
-                sorted_genes <- names(sort(reshaped_data[row_index, selected_genes], decreasing = TRUE))
-                sorted_genes <- unlist(lapply(seq_along(sorted_genes), function(i) rep(sorted_genes[i], each = 2)))
-                sorted_genes <- sorted_genes[-c(1, length(sorted_genes))]
+          observeEvent(input$dataTable_cell_clicked, {
+            info <- input$dataTable_cell_clicked
+            
+            
+            if (!is.null(info)) {
+                row_index <- info$row
+                selected_genes <- names(which(reshaped_data[row_index, ] != 0))
+                print(selected_genes)  
+                # Declare poset_graph outside of the if block
+                poset_graph <- NULL
                 
-                poset_graph <- make_graph(edges = sorted_genes, directed = TRUE)
+                if (length(selected_genes) >= 2) {
+                  sorted_genes <- names(sort(reshaped_data[row_index, selected_genes], decreasing = TRUE))
+                  sorted_genes <- unlist(lapply(seq_along(sorted_genes), function(i) rep(sorted_genes[i], each = 2)))
+                  sorted_genes <- sorted_genes[-c(1, length(sorted_genes))]
+                  
+                  poset_graph <- make_graph(edges = sorted_genes, directed = TRUE)
+                  
+                }
                 
-              }
-              
-              # Rappresentare il grafo con igraph
-              output$posetGraph <- renderPlot({
-                  plot(poset_graph, layout = layout.circle)
-              })
-              
-              output$content <- renderUI({
-                if (!is.null(poset_graph) && length(poset_graph) > 0) {
-                  tagList(
-                    tags$hr(),
-                    plotOutput("posetGraph", width = "100%", height = "400px")
-                  )
-                } 
-              })
-          }
+                # Rappresentare il grafo con igraph
+                output$posetGraph <- renderPlot({
+                    plot(poset_graph, layout = layout.circle)
+                })
+                
+                output$content <- renderUI({
+                  if (!is.null(poset_graph) && length(poset_graph) > 0) {
+                    tagList(
+                      tags$hr(),
+                      plotOutput("posetGraph", width = "100%", height = "400px")
+                    )
+                  } 
+                })
+            }
+          })
         })
       } else if (ncol(data) == 4){        #### Bulk multipla biopsia o single cell 
         if (colnames(data)[2]=="REGION") {
@@ -160,11 +186,31 @@ server <- function(input, output, session) {
           output$SelectColumn <- renderUI({
             selectInput("SelectColumn", "Select column", choices=colnames(reshaped_data), multiple=T)
           })
+          
+          output$DeleteColumn <- renderUI({
+            selectInput("DeleteColumn", "Delete column", choices=colnames(reshaped_data), multiple=T)
+          })
+          
+          output$DeleteRow <- renderUI({
+            selectInput("DeleteRow", "Delete row", choices=row.names(reshaped_data), multiple=T)
+          })
                
           observe({
             if (length(input$SelectColumn) > 0) {
               reshaped_data <- as.data.frame(reshaped_data)
               reshaped_data <- reshaped_data %>% select(!!!rlang::syms(input$SelectColumn))
+            }
+            
+            if (length(input$DeleteColumn) > 0) {
+              reshaped_data <- as.data.frame(reshaped_data)
+              reshaped_data <- reshaped_data %>%
+                select(-all_of(input$DeleteColumn))
+            }
+            
+            if (length(input$DeleteRow) > 0) {
+              reshaped_data <- as.data.frame(reshaped_data)
+              reshaped_data <- reshaped_data %>%
+                slice(-which(rownames(reshaped_data) %in% input$DeleteRow))
             }
                  
             output$dataTable <- renderDT({
@@ -262,12 +308,32 @@ server <- function(input, output, session) {
             output$SelectColumn <- renderUI({
               selectInput("SelectColumn", "Select column", choices=colnames(reshaped_data), multiple=T)
             })
+            
+            output$DeleteColumn <- renderUI({
+              selectInput("DeleteColumn", "Delete column", choices=colnames(reshaped_data), multiple=T)
+            })
+            
+            output$DeleteRow <- renderUI({
+              selectInput("DeleteRow", "Delete row", choices=row.names(reshaped_data), multiple=T)
+            })
               
             observe({
                 
               if (length(input$SelectColumn) > 0) {
                 reshaped_data <- as.data.frame(reshaped_data)
                 reshaped_data <- reshaped_data %>% select(!!!rlang::syms(input$SelectColumn))
+              }
+              
+              if (length(input$DeleteColumn) > 0) {
+                reshaped_data <- as.data.frame(reshaped_data)
+                reshaped_data <- reshaped_data %>%
+                  select(-all_of(input$DeleteColumn))
+              }
+              
+              if (length(input$DeleteRow) > 0) {
+                reshaped_data <- as.data.frame(reshaped_data)
+                reshaped_data <- reshaped_data %>%
+                  slice(-which(rownames(reshaped_data) %in% input$DeleteRow))
               }
                 
               output$dataTable <- renderDT({
