@@ -82,6 +82,24 @@ shinyUI(
             margin-top: 32px;  
           }
           
+          #SelectColumn{
+            margin-top: 10px;  
+          }
+          
+          #main_tabset{
+            margin-top: 30px;  
+          }
+          
+          #create_project_button{
+            margin-top: 30px;  
+          }
+
+          
+          #projectList{
+            margin-top: 30px;  
+            margin-left: -30px;  
+          }
+          
         ")
       )
     ),
@@ -98,8 +116,20 @@ shinyUI(
     ),
     
     tabsetPanel(
-      id = "tabset",
-      tabPanel("Input dati", 
+      id = "main_tabset",
+      tabPanel("Gestione Progetti",
+               fluidRow(
+                 column(6,
+                        actionButton("create_project_button", "Crea Nuovo Progetto")
+                 ),
+                 column(6,
+                        DTOutput("projectList")
+                 )
+               )
+      ),
+      
+      tabPanel("Input dati",
+               id = "input_tab",
                style = "margin-left: 10px; margin-top: 20px;",
                fluidRow(
                  column(6,
@@ -113,20 +143,19 @@ shinyUI(
                           uiOutput("loadBtn2"),
                           uiOutput("directoryInput")
                         )
+                 )),
+               fluidRow(
+                 column(6,
+                        uiOutput("SelectColumn"),
                  ),
-                 fluidRow(
-                   column(6,
-                          uiOutput("SelectColumn"),
-                   ),
-                   column(6,
-                          uiOutput("DeleteColumn"),
-                   ),
+                 column(6,
+                        uiOutput("DeleteColumn"),
                  ),
-                 uiOutput("DeleteRow"),
                ),
+               uiOutput("DeleteRow"),
                DTOutput("dataTable2"),
                conditionalPanel(
-                 condition = "input.loadBtn > 0",
+                 condition = "input.loadBtn > 0 || input.load > 0",
                  actionButton("switchViewBtn", "Switch View"),
                ),
                conditionalPanel(
@@ -139,7 +168,8 @@ shinyUI(
                )
                
       ),
-      tabPanel("Inference", 
+      tabPanel("Inference",
+               id = "inference_tab",
                selectInput("method", "Seleziona il Metodo", c("CCF", "Phylogenies")),
                conditionalPanel(
                  condition = "input.method == 'CCF'",
@@ -164,8 +194,16 @@ shinyUI(
                  numericInput("restarts_phylo", "Restarts", 10)
                ),
                actionButton("submitBtn", "Invia")
+      ),
+      
+      tabPanel("Salva progetto",
+               id = "save_tab",
+               style = "margin-left: 10px; margin-top: 20px;",
+               textInput("project_name", "Nome del progetto", ""),
+               actionButton("saveBtn", "Salva")
       )
     ),
+    
     
     uiOutput("tabsetUI"),
     
@@ -176,3 +214,4 @@ shinyUI(
     )
   )
 )
+

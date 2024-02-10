@@ -15,12 +15,97 @@ library(plotly)
 
 
 server <- function(input, output, session) {
+
+  ######################################################### Caricamento o creazione progetto  #########################################################
+  
+  get_project_names <- function() {
+    project_names <- list.files("output_project")
+    project_names <- data.frame(project_names)
+    return(project_names)
+  }
+  
+  # Funzione per cambiare il tabPanel a "Input dati" quando viene cliccato il pulsante "Crea Nuovo Progetto"
+  observeEvent(input$create_project_button, {
+    updateTabsetPanel(session, "main_tabset", selected = "Input dati")
+  })
+  
+  # Mostra i nomi dei progetti nella cartella "output_project"
+  project_names <- reactive({
+    get_project_names()
+  })
+  
+  print("fatto")  # Print statement to check if this part of the code executes
+  
+  output$projectList <- renderDT({
+    datatable(project_names(), rownames= FALSE)
+    
+  })
   
   
+  # Print "Ciao" when a row is selected in the table
+  observeEvent(input$projectList_cell_clicked, {
+
+    
+    # Verificare se l'evento si è verificato in una cella
+    if (!is.null(input$projectList_cell_clicked)) {
+      # Ottenere l'indice di riga e colonna della cella cliccata
+      clicked_row <- input$projectList_cell_clicked$row
+      clicked_col <- input$projectList_cell_clicked$col
+      
+      # Ottenere il nome del progetto dalla riga cliccata
+      project_name <- project_names()[clicked_row, 1]
+
+        
+      # Costruire il percorso della cartella del progetto
+      project_folder <- file.path("output_project", project_name)
+
+      # Leggere i file nella cartella del progetto
+      project_files <- list.files(project_folder)
+
+        
+      for (file in project_files) {
+        file_name <- tools::file_path_sans_ext(file)
+        if (file_name == "genotipo"){
+          file_directory <- file.path(project_folder, file)
+          data <- read.csv(file_directory)
+          output$dataTable <- renderDT({
+            datatable(data, options = list(scrollX = TRUE))
+          })
+          
+          output$heatmapPlot <- renderPlotly({
+            heatmap_plot <- plot_ly(
+              z = as.matrix(data),
+              x = colnames(data),
+              y = rownames(data),
+              type = "heatmap"
+            ) %>%
+              layout(
+                margin = list(l = 50, r = 50, b = 50, t = 50),
+                xaxis = list(side = "bottom"),
+                yaxis = list(autorange = "reversed")
+              )
+            
+            # Zoom
+            heatmap_plot <- heatmap_plot %>%
+              config(displayModeBar = TRUE) %>%
+              layout(dragmode = "select")
+            
+            return(heatmap_plot)
+          })
+          
+        }
+      }
+    }
+    
+    
+  })
+  
+
 ######################################################### FASE INPUT DATI  #########################################################
   
-  
+  table_data <- reactiveVal(NULL)
   selected_folder <- reactiveVal(NULL)
+  directory_output <- reactiveVal(NULL)
   
   # Visualizzazione del file di resampling, nel caso in cui le colonne siano tre viene rappresentata la tabella
   # negli altri casi viene stampato un messaggio di errore
@@ -106,8 +191,13 @@ server <- function(input, output, session) {
         
           output$dataTable <- renderDT({
               datatable(reshaped_data, options = list(scrollX = TRUE))
+              table_data(reshaped_data)
           })
+          
 
+          table_data(reshaped_data)
+
+          
           #rappresenta heatmap con possibilità di fare zoom
           output$heatmapPlot <- renderPlotly({
               heatmap_plot <- plot_ly(
@@ -217,6 +307,7 @@ server <- function(input, output, session) {
               datatable(reshaped_data, options = list(scrollX = TRUE))
             })
 
+            table_data(reshaped_data)
             
             output$heatmapPlot <- renderPlotly({
               if (ncol(data) == 4) {
@@ -340,6 +431,7 @@ server <- function(input, output, session) {
                 datatable(reshaped_data, options = list(scrollX = TRUE))
               })
             
+              table_data(reshaped_data)
             
               output$heatmapPlot <- renderPlotly({
                 if (ncol(data) == 4) {
@@ -364,6 +456,7 @@ server <- function(input, output, session) {
                 }
               })
             })
+            
             
             observeEvent(input$dataTable_cell_clicked, {
               info <- input$dataTable_cell_clicked
@@ -432,7 +525,6 @@ server <- function(input, output, session) {
       }
     }
   })
-  
   
   
   
@@ -510,4 +602,40 @@ server <- function(input, output, session) {
     }
     result(resExamplePhylogeniesDataset)
   })
+  
+  
+  ######################################################### FASE SALVATAGGIO  #########################################################  
+
+  
+  
+  
+  
+  saveData <- function(data, nome) {
+    write.csv(data, nome, row.names=FALSE)
+  }
+  
+  
+  observe({
+    if (input$project_name != "") {
+      shinyjs::enable("saveBtn")
+    } else {
+      shinyjs::disable("saveBtn")
+    }
+  })
+  
+  observeEvent(input$saveBtn, {
+    nome_progetto <- input$project_name
+    directory_output <- "output_project/"
+    directory_completo <- paste0(directory_output, nome_progetto)
+    
+    # Verifica se la directory esiste, altrimenti creala
+    if (!file.exists(directory_completo)) {
+      dir.create(directory_completo, recursive = TRUE)
+    }
+    
+    directory_file <- paste0(directory_completo, "/genotipo.csv")
+    data <- table_data()  # Ottieni i dati del dataTable dalla variabile reattiva
+    saveData(data, directory_file)  # Salva i dati
+  })
+
 }
