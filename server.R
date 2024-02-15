@@ -15,51 +15,75 @@ library(plotly)
 
 
 server <- function(input, output, session) {
-
-  ######################################################### Caricamento o creazione progetto  #########################################################
   
+  ######################################################### Variables  #########################################################
+  
+  table_data <- reactiveVal(NULL)
+  selected_folder <- reactiveVal(NULL)
+  directory_output <- reactiveVal(NULL)
+  
+
+  ######################################################### Function  #########################################################
+  
+  # returns the list of project names in the output_project folder
   get_project_names <- function() {
     project_names <- list.files("output_project")
     project_names <- data.frame(project_names)
     return(project_names)
   }
   
-  # Funzione per cambiare il tabPanel a "Input dati" quando viene cliccato il pulsante "Crea Nuovo Progetto"
+  generate_heatmap_plot <- function(data) {
+    heatmap_plot <- plot_ly(
+      z = as.matrix(data),
+      x = colnames(data),
+      y = rownames(data),
+      type = "heatmap"
+    ) %>%
+      layout(
+        margin = list(l = 50, r = 50, b = 50, t = 50),
+        xaxis = list(side = "bottom"),
+        yaxis = list(autorange = "reversed")
+      )
+    
+    # Zoom
+    heatmap_plot <- heatmap_plot %>%
+      config(displayModeBar = TRUE) %>%
+      layout(dragmode = "select")
+    
+    return(heatmap_plot)
+  }
+  
+  
+  ######################################################### Load or create project  #########################################################
+  
+  
+  # Function to change the tabPanel to "Data Input" when the "Create New Project" button is clicked
   observeEvent(input$create_project_button, {
     updateTabsetPanel(session, "main_tabset", selected = "Input dati")
   })
   
-  # Mostra i nomi dei progetti nella cartella "output_project"
+  # Show project names in "output_project" folder
   project_names <- reactive({
     get_project_names()
   })
   
-  print("fatto")  # Print statement to check if this part of the code executes
-  
+  # Show the table with the names of existing projects
   output$projectList <- renderDT({
     datatable(project_names(), rownames= FALSE)
     
   })
   
-  
-  # Print "Ciao" when a row is selected in the table
+  # Management click on existing project table
   observeEvent(input$projectList_cell_clicked, {
 
     
-    # Verificare se l'evento si è verificato in una cella
     if (!is.null(input$projectList_cell_clicked)) {
-      # Ottenere l'indice di riga e colonna della cella cliccata
+      
       clicked_row <- input$projectList_cell_clicked$row
       clicked_col <- input$projectList_cell_clicked$col
       
-      # Ottenere il nome del progetto dalla riga cliccata
       project_name <- project_names()[clicked_row, 1]
-
-        
-      # Costruire il percorso della cartella del progetto
       project_folder <- file.path("output_project", project_name)
-
-      # Leggere i file nella cartella del progetto
       project_files <- list.files(project_folder)
 
         
@@ -73,60 +97,38 @@ server <- function(input, output, session) {
           })
           
           output$heatmapPlot <- renderPlotly({
-            heatmap_plot <- plot_ly(
-              z = as.matrix(data),
-              x = colnames(data),
-              y = rownames(data),
-              type = "heatmap"
-            ) %>%
-              layout(
-                margin = list(l = 50, r = 50, b = 50, t = 50),
-                xaxis = list(side = "bottom"),
-                yaxis = list(autorange = "reversed")
-              )
-            
-            # Zoom
-            heatmap_plot <- heatmap_plot %>%
-              config(displayModeBar = TRUE) %>%
-              layout(dragmode = "select")
-            
-            return(heatmap_plot)
+            generate_heatmap_plot(data)
           })
-          
         }
       }
     }
-    
-    
   })
   
 
-######################################################### FASE INPUT DATI  #########################################################
+######################################################### Input data  #########################################################
   
-  table_data <- reactiveVal(NULL)
-  selected_folder <- reactiveVal(NULL)
-  directory_output <- reactiveVal(NULL)
   
-  # Visualizzazione del file di resampling, nel caso in cui le colonne siano tre viene rappresentata la tabella
-  # negli altri casi viene stampato un messaggio di errore
+  # Displaying the resampling file, in the case where there are three columns (single bulk case) the table is represented.
+  # in other cases an error message is printed
   observeEvent(input$loadBtn2, {
+    #resampling file
     inFile2 <- input$dataFile2
     data2 <- read.table(inFile2$datapath, sep = "\t", header = TRUE, stringsAsFactors = FALSE)
+    #genotype file
     inFile <- input$dataFile
     data <- read.table(inFile$datapath, sep = "\t", header = TRUE, stringsAsFactors = FALSE)
     
-    # Verifica che il secondo file abbia due colonne
     if (ncol(data) == 3) {
       output$dataTable2 <- renderDT({
         datatable(data2, options = list(scrollX = TRUE))
       })
     } else {
-      showNotification("Resampling non necessario", type = "error")
+      showNotification("Resampling file not necessary", type = "error")
     }
   })
   
   
-  # Visualizzazione della matrice agaenotipo
+  # Displaying the genotype file
   observeEvent(input$loadBtn, {
     output$dataTable2 <- renderDT({})
     output$directoryInput <- renderUI({})
@@ -191,7 +193,6 @@ server <- function(input, output, session) {
         
           output$dataTable <- renderDT({
               datatable(reshaped_data, options = list(scrollX = TRUE))
-              table_data(reshaped_data)
           })
           
 

@@ -155,7 +155,7 @@ shinyUI(
                uiOutput("DeleteRow"),
                DTOutput("dataTable2"),
                conditionalPanel(
-                 condition = "input.loadBtn > 0 || input.load > 0",
+                 condition = "input.loadBtn > 0 || input.projectList_rows_all > 0",
                  actionButton("switchViewBtn", "Switch View"),
                ),
                conditionalPanel(
