@@ -10,6 +10,7 @@ library(reshape2)
 library(dplyr)
 library(shinyFiles)
 library(igraph)
+library(shinycssloaders)
 
 shinyUI(
   fluidPage(
@@ -81,10 +82,7 @@ shinyUI(
           #directoryInput{
             margin-top: 32px;  
           }
-          
-          #SelectColumn{
-            margin-top: 10px;  
-          }
+
           
           #main_tabset{
             margin-top: 30px;  
@@ -98,6 +96,10 @@ shinyUI(
           #projectList{
             margin-top: 30px;  
             margin-left: -30px;  
+          }
+          
+          #inference_tab{
+            margin-top: 600px; 
           }
           
         ")
@@ -123,7 +125,8 @@ shinyUI(
                         actionButton("create_project_button", "Crea Nuovo Progetto")
                  ),
                  column(6,
-                        DTOutput("projectList")
+                        DTOutput("projectList"),
+                        actionButton("loadProjBtn", "Carica")
                  )
                )
       ),
@@ -146,16 +149,20 @@ shinyUI(
                  )),
                fluidRow(
                  column(6,
-                        uiOutput("SelectColumn"),
+                        uiOutput("DeleteColumn"),
                  ),
                  column(6,
-                        uiOutput("DeleteColumn"),
+                        conditionalPanel(
+                          condition = "input.loadBtn > 0",
+                          numericInput("binarization", "Filtro per binarizzare", value = 1, min = 0, max = 1, step = 0.01),
+                          uiOutput("binarization_perc")
+                        ),
                  ),
                ),
                uiOutput("DeleteRow"),
                DTOutput("dataTable2"),
                conditionalPanel(
-                 condition = "input.loadBtn > 0 || input.projectList_rows_all > 0",
+                 condition = "input.loadBtn > 0 || input.loadProjBtn > 0",
                  actionButton("switchViewBtn", "Switch View"),
                ),
                conditionalPanel(
@@ -166,34 +173,32 @@ shinyUI(
                  condition = "input.switchViewBtn % 2 == 0",
                  plotly::plotlyOutput("heatmapPlot")
                )
-               
       ),
       tabPanel("Inference",
                id = "inference_tab",
-               selectInput("method", "Seleziona il Metodo", c("CCF", "Phylogenies")),
-               conditionalPanel(
-                 condition = "input.method == 'CCF'",
-                 fileInput("dataset", "Carica Dataset"),
-                 fileInput("ccfDataset", "Carica CCF Dataset"),
-                 numericInput("nsampling", "Numero di campionamenti", 100),
-                 conditionalPanel(
-                   condition = "input.nsampling > 0",
-                   fileInput("vafDataset", "Carica VAF Dataset")
+               fluidRow(
+                 column(6, 
+                        checkboxInput("resamplingFlag", "Resampling"),
+                        conditionalPanel(
+                          condition = "input.resamplingFlag == true",
+                          numericInput("nresampling", "Numero di campionamenti", 3, min = 3)
+                        )
                  ),
-                 selectInput("regularization", "Regularization", c("aic", "bic")),
-                 textInput("command", "Command", "hc"),
-                 numericInput("restarts", "Restarts", 10)
+                 column(6,
+                        selectInput("regularization", "Regularization", c("aic", "bic")),
+                        selectInput("command", "Command", c("hc","tabu"))
+                 ),
+                 column(6,
+                        numericInput("restarts", "Restarts", 10, min = 0)
+                 ),
+                 column(6,
+                        numericInput("seed", "Seed", 12345, min = 0)
+                 )
                ),
-               conditionalPanel(
-                 condition = "input.method == 'Phylogenies'",
-                 fileInput("dataset_phylo", "Carica Dataset"),
-                 fileInput("models_phylo", "Carica Models"),
-                 numericInput("nsampling_phylo", "Numero di campionamenti", 100),
-                 selectInput("regularization_phylo", "Regularization", c("aic", "bic")),
-                 textInput("command_phylo", "Command", "hc"),
-                 numericInput("restarts_phylo", "Restarts", 10)
-               ),
-               actionButton("submitBtn", "Invia")
+               actionButton("submitBtn", "Invia"),
+               uiOutput("interruptButton"),
+               uiOutput("spinner"),
+               style = "margin-top: 30px;"
       ),
       
       tabPanel("Salva progetto",

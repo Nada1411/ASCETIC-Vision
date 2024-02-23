@@ -290,7 +290,6 @@ server <- function(input, output, session) {
       if (nsampling > 0) {
         file_inputs <- list(input$dataset, input$ccfDataset, input$vafDataset)
         environments <- loadEnvironment(file_inputs)
-        
         resExampleSingleSamplesResampling  <- asceticCCFResampling(
           dataset = environments$data_1,
           ccfDataset = environments$data_2,
@@ -303,7 +302,6 @@ server <- function(input, output, session) {
       } else {
         file_inputs <- list(input$dataset, input$ccfDataset)
         environments <- loadEnvironment(file_inputs)
-        
         resExampleSingleSamples <- asceticCCF(
           dataset = environments$data_1,
           ccfDataset = environments$data_2,
@@ -315,15 +313,15 @@ server <- function(input, output, session) {
     } else if (method == "Phylogenies") {
       file_inputs <- list(input$dataset_phylo, input$models_phylo)
       environments <- loadEnvironment(file_inputs)
-      
       if (nsampling_ph > 0) {
+      
         resExamplePhylogeniesDataset <- asceticPhylogeniesBootstrap(
-          dataset = environments$data_1,
-          models  = environments$data_2,
-          nsampling = nsampling_ph,
-          regularization = input$regularization_phylo,
-          command = input$command_phylo,
-          restarts = input$restarts_phylo
+         dataset = environments$data_1,
+         models  = environments$data_2,
+         nsampling = nsampling_ph,
+         regularization = input$regularization_phylo,
+         command = input$command_phylo,
+         restarts = input$restarts_phylo
         )
       } else {
         resExamplePhylogeniesDataset <- asceticPhylogenies(
