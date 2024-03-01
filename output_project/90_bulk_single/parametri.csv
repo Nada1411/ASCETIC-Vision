@@ -1,0 +1,11 @@
+"Nome","Valore"
+"binarization","1"
+"del_col",NA
+"del_row",NA
+"flag_resampling","1"
+"nresampling","3"
+"restarts","10"
+"regularization","aic"
+"command","hc"
+"seed","12345"
+"output_inference","binarization"

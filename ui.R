@@ -11,12 +11,16 @@ library(dplyr)
 library(shinyFiles)
 library(igraph)
 library(shinycssloaders)
+library("bsplus")
 
 shinyUI(
   fluidPage(
     tags$head(
       tags$style(
         HTML("
+        @import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:ital,wght@0,100..900;1,100..900&display=swap');
+        
+        
           #header {
             background-color: #5f9ea0;
             padding: 5;
@@ -87,20 +91,20 @@ shinyUI(
           #main_tabset{
             margin-top: 30px;  
           }
-          
-          #create_project_button{
-            margin-top: 30px;  
-          }
+
 
           
           #projectList{
             margin-top: 30px;  
-            margin-left: -30px;  
           }
           
           #inference_tab{
             margin-top: 600px; 
           }
+          
+          body {
+          font-family: Roboto Condensed;
+        }
           
         ")
       )
@@ -119,14 +123,18 @@ shinyUI(
     
     tabsetPanel(
       id = "main_tabset",
-      tabPanel("Gestione Progetti",
-               fluidRow(
-                 column(6,
-                        actionButton("create_project_button", "Crea Nuovo Progetto")
-                 ),
-                 column(6,
-                        DTOutput("projectList"),
-                        actionButton("loadProjBtn", "Carica")
+      tabPanel("Home Page",
+               fluidPage(
+                 style = "margin-left: 100px; margin-right: 100px; margin-top: 100px;background-color: lightblue",
+                 DTOutput("projectList"),
+                 fluidRow(
+                   style = "display: flex; justify-content: center; margin-top: 40px;", 
+                   column(3,
+                          actionButton("loadProjBtn", "Load existing project"),
+                   ),
+                   column(3,
+                          actionButton("create_project_button", "Create New Project")
+                   )
                  )
                )
       ),
@@ -136,7 +144,13 @@ shinyUI(
                style = "margin-left: 10px; margin-top: 20px;",
                fluidRow(
                  column(6,
-                        fileInput("dataFile", "Genotipo"),
+                        fileInput("dataFile", "Genotipo")%>%
+                          shinyInput_label_embed(
+                            shiny_iconlink() %>%
+                              bs_embed_popover(
+                                title = "Genotipo"
+                              )
+                          ),
                         actionButton("loadBtn", "Load")
                  ),
                  column(6,
@@ -154,16 +168,22 @@ shinyUI(
                  column(6,
                         conditionalPanel(
                           condition = "input.loadBtn > 0",
-                          numericInput("binarization", "Filtro per binarizzare", value = 1, min = 0, max = 1, step = 0.01),
-                          uiOutput("binarization_perc")
+                          uiOutput("binarization")  
                         ),
                  ),
                ),
-               uiOutput("DeleteRow"),
+               fluidRow(
+                 column(6,
+                        uiOutput("DeleteRow"),
+                 ),
+                 column(6,
+                        uiOutput("binarization_perc"),
+                 ),
+               ),
                DTOutput("dataTable2"),
                conditionalPanel(
                  condition = "input.loadBtn > 0 || input.loadProjBtn > 0",
-                 actionButton("switchViewBtn", "Switch View"),
+                 uiOutput("switchViewBtn"),
                ),
                conditionalPanel(
                  condition = "input.switchViewBtn % 2 == 1",
@@ -172,6 +192,9 @@ shinyUI(
                conditionalPanel(
                  condition = "input.switchViewBtn % 2 == 0",
                  plotly::plotlyOutput("heatmapPlot")
+               ),
+               fluidRow(
+                 column(12, uiOutput("content"))
                )
       ),
       tabPanel("Inference",
@@ -185,7 +208,7 @@ shinyUI(
                         )
                  ),
                  column(6,
-                        selectInput("regularization", "Regularization", c("aic", "bic")),
+                        selectInput("regularization", "Regularization", c("aic", "bic", "loglik", "ebic", "pred-loglik", "bde", "bds", "mbde", "bdla", "k2", "fnml", "qnml", "nal", "pnal"), multiple = TRUE, selected = "aic"),
                         selectInput("command", "Command", c("hc","tabu"))
                  ),
                  column(6,
@@ -196,6 +219,9 @@ shinyUI(
                  )
                ),
                actionButton("submitBtn", "Invia"),
+               uiOutput("visualize_inference"),
+               DTOutput("selected_result_output"),
+               plotOutput("graph_inference"),
                uiOutput("interruptButton"),
                uiOutput("spinner"),
                style = "margin-top: 30px;"
@@ -213,10 +239,6 @@ shinyUI(
     uiOutput("tabsetUI"),
     
     div(id = "linea", class = "linea"), 
-    
-    fluidRow(
-      column(12, uiOutput("content"))
-    )
   )
 )
 
