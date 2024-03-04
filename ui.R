@@ -1,18 +1,5 @@
 # ui.R
 
-library(shiny)
-library(shinyjs)
-library("ASCETIC")
-library(DT)
-library(tidyr)
-library(data.table)
-library(reshape2)
-library(dplyr)
-library(shinyFiles)
-library(igraph)
-library(shinycssloaders)
-library("bsplus")
-
 shinyUI(
   fluidPage(
     tags$head(
@@ -91,8 +78,6 @@ shinyUI(
           #main_tabset{
             margin-top: 30px;  
           }
-
-
           
           #projectList{
             margin-top: 30px;  
@@ -229,10 +214,7 @@ shinyUI(
                actionButton("saveBtn", "Salva")
       )
     ),
-    
-    
     uiOutput("tabsetUI"),
-    
     div(id = "linea", class = "linea"), 
   )
 )
