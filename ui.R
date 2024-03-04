@@ -154,22 +154,17 @@ shinyUI(
                         actionButton("loadBtn", "Load")
                  ),
                  column(6,
-                        conditionalPanel(
-                          condition = "input.loadBtn > 0",
                           uiOutput("dataFile2"),
                           uiOutput("loadBtn2"),
                           uiOutput("directoryInput")
-                        )
+
                  )),
                fluidRow(
                  column(6,
                         uiOutput("DeleteColumn"),
                  ),
                  column(6,
-                        conditionalPanel(
-                          condition = "input.loadBtn > 0",
-                          uiOutput("binarization")  
-                        ),
+                        uiOutput("binarization")  
                  ),
                ),
                fluidRow(
