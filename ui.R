@@ -1,15 +1,40 @@
 # ui.R
 
+library(shiny)
+library(shinyjs)
+library("ASCETIC")
+library(DT)
+library(tidyr)
+library(data.table)
+library(reshape2)
+library(dplyr)
+library(shinyFiles)
+library(igraph)
+library(shinycssloaders)
+library("bsplus")
+
+
+
+
 shinyUI(
   fluidPage(
+
+    
     tags$head(
       tags$style(
         HTML("
-        @import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:ital,wght@0,100..900;1,100..900&display=swap');
+          @import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:ital,wght@0,100..900;1,100..900&display=swap');
         
+          body {
+            font-family: Roboto Condensed;
+          }
+          
+          button {
+            color: red;
+          }
         
           #header {
-            background-color: #5f9ea0;
+            background-color: #4A687E;
             padding: 5;
             color: white;
             display: flex;
@@ -19,26 +44,10 @@ shinyUI(
 
           #asceticTitle {
             font-weight: bold;
-            background-color: #00796B;
+            background-color: #242D33;
             padding: 10px 35px;
             margin-right: 10px;
             color: white;
-          }
-
-          .sectionBtn {
-            background: none;
-            border: none;
-            color: #008080;
-            padding: 10px 20px;
-            border-radius: 5px;
-            margin-top: 50px;
-          }
-
-          .linea {
-            border-bottom: 2px solid #008080;
-            width: 100%;
-            margin-top: 10px;
-            display: none; 
           }
 
           #content {
@@ -60,8 +69,7 @@ shinyUI(
           #switchViewBtn {
             margin-top: 40px;  
           }
-          
-          
+
           #dataTable2 {
             margin-top: 60px;  
           }
@@ -73,26 +81,40 @@ shinyUI(
           #directoryInput{
             margin-top: 32px;  
           }
-
           
           #main_tabset{
             margin-top: 30px;  
           }
           
           #projectList{
-            margin-top: 30px;  
+            margin-top: -20px;  
           }
           
           #inference_tab{
             margin-top: 600px; 
           }
+
+          .linea {
+            border-bottom: 2px solid #008080;
+            width: 100%;
+            margin-top: 10px;
+            display: none; 
+          }
+
+          .custom-button {
+            color: white;
+            background-color: #4A687E;
+            border-color: #4A687E;
+            border-radius: 3px;
+          }
           
-          body {
-          font-family: Roboto Condensed;
-        }
-          
+          .custom-button:hover, .custom-button:active {
+            color: white;
+            background-color: #242D33;
+            border-color: #242D33;
+          }
         ")
-      )
+      ),
     ),
     
     
@@ -108,25 +130,26 @@ shinyUI(
     
     tabsetPanel(
       id = "main_tabset",
-      tabPanel("Home Page",
+      tabPanel(HTML("<span style='color: #4A687E;'>Home page</span>"),
+               class = "custom-tab-panel",
                fluidPage(
-                 style = "margin-left: 100px; margin-right: 100px; margin-top: 100px;background-color: lightblue",
+                 style = "margin-left: 100px; margin-right: 100px; margin-top: 100px;background-color: white",
                  DTOutput("projectList"),
                  fluidRow(
                    style = "display: flex; justify-content: center; margin-top: 40px;", 
                    column(3,
-                          actionButton("loadProjBtn", "Load existing project"),
+                          actionButton("loadProjBtn", "Load existing project", class = "custom-button"),
                    ),
                    column(3,
-                          actionButton("create_project_button", "Create New Project")
+                          actionButton("create_project_button", "Create New Project", class = "custom-button")
                    )
                  )
                )
       ),
       
-      tabPanel("Input dati",
+      tabPanel(HTML("<span style='color: #4A687E;'>Input dati</span>"),
                id = "input_tab",
-               style = "margin-left: 10px; margin-top: 20px;",
+               style = "margin-left: 10px; margin-right: 10px; margin-top: 40px;",
                fluidRow(
                  column(6,
                         fileInput("dataFile", "Genotipo")%>%
@@ -136,7 +159,7 @@ shinyUI(
                                 title = "Genotipo"
                               )
                           ),
-                        actionButton("loadBtn", "Load")
+                        actionButton("loadBtn", "Load", class = "custom-button")
                  ),
                  column(6,
                           uiOutput("dataFile2"),
@@ -163,6 +186,7 @@ shinyUI(
                DTOutput("dataTable2"),
                conditionalPanel(
                  condition = "input.loadBtn > 0 || input.loadProjBtn > 0",
+                 class = "text-center",
                  uiOutput("switchViewBtn"),
                ),
                conditionalPanel(
@@ -177,28 +201,30 @@ shinyUI(
                  column(12, uiOutput("content"))
                )
       ),
-      tabPanel("Inference",
+      tabPanel(HTML("<span style='color: #4A687E;'>Inference</span>"),
                id = "inference_tab",
                fluidRow(
-                 column(6, 
-                        checkboxInput("resamplingFlag", "Resampling"),
-                        conditionalPanel(
-                          condition = "input.resamplingFlag == true",
-                          numericInput("nresampling", "Numero di campionamenti", 3, min = 3)
-                        )
-                 ),
                  column(6,
                         selectInput("regularization", "Regularization", c("aic", "bic", "loglik", "ebic", "pred-loglik", "bde", "bds", "mbde", "bdla", "k2", "fnml", "qnml", "nal", "pnal"), multiple = TRUE, selected = "aic"),
-                        selectInput("command", "Command", c("hc","tabu"))
-                 ),
-                 column(6,
+                        selectInput("command", "Command", c("hc","tabu")),
                         numericInput("restarts", "Restarts", 10, min = 0)
                  ),
-                 column(6,
-                        numericInput("seed", "Seed", 12345, min = 0)
-                 )
+                 column(6, 
+                        numericInput("seed", "Seed", 12345, min = 0),
+                        tags$div(
+                          checkboxInput("resamplingFlag", HTML("<strong>Resampling</strong>")),
+                          style = "margin-top: 45px;", width = "500px"
+                        ),
+                        conditionalPanel(
+                          condition = "input.resamplingFlag == true",
+                          tags$div(
+                            numericInput("nresampling", "Numero di campionamenti", 3, min = 3),
+                            style = "margin-top: 25px;"
+                          )
+                        )
+                 ),
                ),
-               actionButton("submitBtn", "Invia"),
+               actionButton("submitBtn", "Invia", class = "custom-button"),
                uiOutput("visualize_inference"),
                DTOutput("selected_result_output"),
                plotOutput("graph_inference"),
@@ -207,11 +233,11 @@ shinyUI(
                style = "margin-top: 30px;"
       ),
       
-      tabPanel("Salva progetto",
+      tabPanel(HTML("<span style='color: #4A687E;'>Salva progetto</span>"),
                id = "save_tab",
                style = "margin-left: 10px; margin-top: 20px;",
                textInput("project_name", "Nome del progetto", ""),
-               actionButton("saveBtn", "Salva")
+               actionButton("saveBtn", "Salva", class = "custom-button")
       )
     ),
     uiOutput("tabsetUI"),
