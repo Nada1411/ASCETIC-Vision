@@ -14,6 +14,12 @@ library(POSetR)
 library(plotly)
 library(tibble)
 library(shinyWidgets)
+library(ggtree)
+library(ggraph)
+library(igraph)
+library(visNetwork)
+
+
 
 server <- function(input, output, session) {
   
@@ -30,6 +36,9 @@ server <- function(input, output, session) {
   calculationInProgress <- reactiveVal(NULL)
   resampling_res <- reactiveVal(NULL)
   reshaped_data2 <- reactiveVal(NULL)
+  ranges <- reactiveValues(x = NULL, y = NULL)
+  ranges <- reactiveValues(x = NULL, y = NULL)
+  orig <- reactiveVal(NULL)
 
   ############################ Function  #######################################
   
@@ -55,6 +64,8 @@ server <- function(input, output, session) {
     updateNumericInput(session, "restarts", value = 10)
     updateNumericInput(session, "seed", value = 12345)
     output$visualize_inference <- NULL
+    output$graph_inference <- NULL
+    orig <- reactiveVal(NULL)
   }
   
   default_values_create_project <- function() {
@@ -79,6 +90,8 @@ server <- function(input, output, session) {
     updateNumericInput(session, "restarts", value = 10)
     updateNumericInput(session, "seed", value = 12345)
     output$visualize_inference <- NULL
+    output$graph_inference <- NULL
+    orig <- reactiveVal(NULL)
   }
   
   
@@ -100,7 +113,8 @@ server <- function(input, output, session) {
       layout(
         margin = list(l = 50, r = 50, b = 50, t = 50),
         xaxis = list(side = "bottom"),
-        yaxis = list(autorange = "reversed")
+        yaxis = list(autorange = "reversed"),
+        paper_bgcolor = "#ECF0F5"
       )
     
     # Zoom
@@ -131,16 +145,28 @@ server <- function(input, output, session) {
           poset_graph <- make_graph(edges = sorted_genes, directed = TRUE)
         }
         
-        output$posetGraph <- renderPlot({
-          plot(poset_graph, layout = layout.circle)
-        })
         
+        output$posetGraph <- renderVisNetwork({
+          
+          nodes <- as_tibble(get.vertex.attribute(poset_graph))
+          colnames(nodes) <- "id"
+          nodes <- data.frame(nodes, label= nodes$id)
+          edges <- as_tibble(as_edgelist(poset_graph))
+          colnames(edges) <- c("from", "to")
+          
+          
+          generateVisNetwork(nodes, edges, "poset", "Poset")
+        })
+
         
         output$content <- renderUI({
           if (!is.null(poset_graph) && length(poset_graph) > 0) {
             tagList(
               tags$hr(),
-              plotOutput("posetGraph", width = "100%", height = "400px")
+              div(
+                style = "display: flex; justify-content: center; margin-top: 50px;",
+                visNetworkOutput("posetGraph", width = "50%", height = "400px")
+              )
             )
           } 
         })
@@ -152,27 +178,49 @@ server <- function(input, output, session) {
   # selection/deletion of row and column
   modify_reshaped_data <- function(reshaped_data) {
     
-    if (length(input$DeleteColumn) > 0) {
-      reshaped_data <- as.data.frame(reshaped_data)
-      reshaped_data <- reshaped_data %>%
-        select(-all_of(input$DeleteColumn))
-      reshaped_data <- as.matrix(reshaped_data)
+    if(is.null(input$DeleteColumn)) {
+      output$dataTable <- renderDT({
+        datatable(orig(), options = list(scrollX = TRUE), selection = "single")
+      })
+      output$heatmapPlot <- renderPlotly({
+        generate_heatmap_plot(orig())
+      })
     }
     
-    if (length(input$DeleteRow) > 0) {
+    observeEvent(input$DeleteColumn, { 
       reshaped_data <- as.data.frame(reshaped_data)
-      reshaped_data <- reshaped_data %>%
-        slice(-which(rownames(reshaped_data) %in% input$DeleteRow))
+      columns_to_delete <- which(colnames(reshaped_data) == input$DeleteColumn)
+      reshaped_data <- reshaped_data[, -columns_to_delete, drop = FALSE]
       reshaped_data <- as.matrix(reshaped_data)
-    }
+      output$dataTable <- renderDT({
+        datatable(reshaped_data, options = list(scrollX = TRUE), selection = "single")
+      })
+      output$heatmapPlot <- renderPlotly({
+        generate_heatmap_plot(reshaped_data)
+      })
+    })
     
+      
+    observeEvent(input$DeleteRow, { 
+      reshaped_data <- as.data.frame(reshaped_data)
+       reshaped_data <- reshaped_data %>%
+         slice(-which(rownames(reshaped_data) %in% input$DeleteRow))
+      reshaped_data <- as.matrix(reshaped_data)
+      output$dataTable <- renderDT({
+        datatable(reshaped_data, options = list(scrollX = TRUE), 
+                  selection ="single")
+      })
+      output$heatmapPlot <- renderPlotly({
+        generate_heatmap_plot(reshaped_data)
+      })
+    })
     return(reshaped_data)
   }
+  
   
   observe_data_modification <- function(reshaped_data) {
     observe({
       reshaped_data <- modify_reshaped_data(reshaped_data)
-      
       output$dataTable <- renderDT({
         datatable(reshaped_data, options = list(scrollX = TRUE), 
                   selection ="single")
@@ -215,7 +263,6 @@ server <- function(input, output, session) {
         
         file_data <- file_data[, c(id_column_name, setdiff(col_names, 
                                                            id_column_name))]
-        
         if (length(input$DeleteColumn) > 0){
           for (col in input$DeleteColumn) {
             if(col %in% colnames(file_data)) {
@@ -254,7 +301,10 @@ server <- function(input, output, session) {
         output$content <- renderUI({
           tagList(
             tags$hr(),
-            plotOutput("graphPlot") 
+            div(
+              style = "display: flex; justify-content: center; margin-top: 50px;",
+              visNetworkOutput("graphPlot", width = "50%", height = "400px")
+            )
           )
         })
         
@@ -267,9 +317,19 @@ server <- function(input, output, session) {
         
         graph <- graph_from_data_frame(edges, directed = TRUE)
         
-        output$graphPlot <- renderPlot({
-          plot(graph, edge.label = edges$value, layout = layout.reingold.tilford)
+        
+        output$graphPlot <- renderVisNetwork({
+          
+          nodes <- as_tibble(get.vertex.attribute(graph))
+          colnames(nodes) <- "id"
+          nodes <- data.frame(nodes, label= nodes$id)
+          edges <- as_tibble(as_edgelist(graph))
+          colnames(edges) <- c("from", "to")
+          
+          
+          generateVisNetwork(nodes, edges, "other", "DAG")
         })
+        
         }
     })
   }
@@ -327,6 +387,7 @@ server <- function(input, output, session) {
   
   # Function for the interrupt key in the inference phase
   bulk_single_case <- function() {
+    
     output$dataFile2 <- renderUI({
       fileInput("dataFile2", "Resampling")
     })
@@ -340,7 +401,7 @@ server <- function(input, output, session) {
     output$DeleteRow <- render_delete_row_ui("DeleteRow", 
                                              "Delete row", 
                                              reshaped_data())
-
+    
     # Management deletion or selection of rows and columns
     observe_data_modification(reshaped_data())
   }
@@ -362,10 +423,124 @@ server <- function(input, output, session) {
       req(input$dir)
       selected_folder(parseDirPath(c(wd = getwd()), input$dir))
     })
+    
+    observe({
       
-    shinyDirChoose(input, "dir", roots = c(wd = getwd()), filetypes = c("", "txt"))
+      modified_data <- modify_reshaped_data(modified_data)
       
+      output$dataTable <- renderDT({
+        datatable(modified_data, options = list(scrollX = TRUE), 
+                  selection ="single")
+      })
+      
+      reshaped_data(modified_data)
+      
+      output$heatmapPlot <- renderPlotly({
+        generate_heatmap_plot(modified_data)
+      })
+    })
+    
+    output$directoryInput <- renderUI({
+      shinyDirButton("dir", "Seleziona una cartella", 
+                     title = "Seleziona una cartella", multiple = FALSE)
+    })
+    
+    observe({
+      req(input$dir)
+      selected_folder(parseDirPath(c(wd = getwd()), input$dir))
+    })
+    
+    shinyDirChoose(input, "dir", roots = c(wd = getwd()), 
+                   filetypes = c("", "txt"))
   }
+  
+  single_cell_case <- function() {
+    modified_data <- reshaped_data()
+    
+    output$DeleteColumn <- render_delete_column_ui("DeleteColumn", 
+                                                   "Delete column", 
+                                                   reshaped_data())
+    output$DeleteRow <- render_delete_row_ui("DeleteRow", 
+                                             "Delete row", 
+                                             reshaped_data())
+    
+    
+    handle_dataTable_cell_clicked(reshaped_data(), "ID")
+    
+    observe({
+      req(input$dir)
+      selected_folder(parseDirPath(c(wd = getwd()), input$dir))
+    })
+    
+    observe({
+      
+      modified_data <- modify_reshaped_data(modified_data)
+      
+      output$dataTable <- renderDT({
+        datatable(modified_data, options = list(scrollX = TRUE), 
+                  selection ="single")
+      })
+      
+      reshaped_data(modified_data)
+      
+      output$heatmapPlot <- renderPlotly({
+        generate_heatmap_plot(modified_data)
+      })
+    })
+    
+    output$directoryInput <- renderUI({
+      shinyDirButton("dir", "Select a folder", title = "Select a folder", 
+                     multiple = FALSE)
+    })
+    shinyDirChoose(input, "dir", roots = c(wd = getwd()), filetypes = c("", "txt"))
+    
+  }
+  
+  generateVisNetwork <- function(nodes, edges, layout_type, title) {
+    main_options <- list(text = title,
+                         style = "font-family:https://fonts.googleapis.com/css2?family=Roboto+Condensed:ital,wght@0,100..900;1,100..900&display=swap;
+                                font-weight: bold;
+                                text-align:center;")
+    
+    if (layout_type == "poset") {
+      visNetwork(nodes, edges, main = main_options) %>%
+        visHierarchicalLayout(direction = "LR") %>%
+        visNodes(
+          shape = "dot",
+          color = list(
+            background = "#23B3E8",
+            border = "#013848",
+            highlight = "#E112EB"
+          ),
+          shadow = list(enabled = TRUE, size = 10),
+          font = list(size = 20, vadjust = -50)
+        ) %>%
+        visEdges(
+          shadow = FALSE,
+          color = list(color = "#0085AF", highlight = "#E112EB"),
+          arrows = "to"
+        )
+    } else {
+      visNetwork(nodes, edges, main = main_options) %>%
+        visIgraphLayout(layout = "layout_with_sugiyama") %>%
+        visNodes(
+          shape = "dot",
+          color = list(
+            background = "#23B3E8",
+            border = "#013848",
+            highlight = "#E112EB"
+          ),
+          shadow = list(enabled = TRUE, size = 10),
+          font = list(size = 20, vadjust = -50)
+        ) %>%
+        visEdges(
+          shadow = FALSE,
+          color = list(color = "#0085AF", highlight = "#E112EB"),
+          arrows = "to"
+        )
+    }
+  }
+  
   
   
   #################### Load or create project  #################################
@@ -434,13 +609,7 @@ server <- function(input, output, session) {
             file_name <- tools::file_path_sans_ext(file)
             file_directory <- file.path(project_folder, file)
             
-            if (file_name == "parametri_single_cell"){
-              parametri <- read.csv(file_directory)
-              
-              directory <- parametri$Valore[parametri$Nome == "directory"]
-              updateShinyDirButton(session, "dir", value = directory)
-            }
-            else if (file_name == "resampling_table") {
+            if (file_name == "resampling_table") {
               data2 <- read.csv(file_directory)
               output$dataTable2 <- renderDT({
                 datatable(data2, options = list(scrollX = TRUE), selection ="single")
@@ -462,13 +631,6 @@ server <- function(input, output, session) {
                                  "Filter to binarize percentage", 
                                  value = val_bin_perc, min = 0, 
                                  max = 1, step = 0.01)
-                  })
-                }
-                else if (parametro == "directory") {
-                  output$directoryInput <- renderUI({
-                    shinyDirButton("dir", "Seleziona una cartella", 
-                                   title = "Seleziona una cartella", 
-                                   multiple = FALSE, dirname = valore)
                   })
                 }
               }
@@ -500,6 +662,9 @@ server <- function(input, output, session) {
               }
               else if(case() == "bulk_multiple") {
                 bulk_multiple_case()
+              }
+              else if(case() == "single_cell") {
+                single_cell_case()
               }
               
             }
@@ -585,6 +750,7 @@ server <- function(input, output, session) {
     return(output)
   }
   
+  
   # Function to render UI for deleting rows
   render_delete_row_ui <- function(input_id, label, data) {
     output <- renderUI({
@@ -626,7 +792,7 @@ server <- function(input, output, session) {
       data <- read.table(inFile$datapath, sep = "\t", header = TRUE, 
                          stringsAsFactors = FALSE)
       
-      
+      orig(data)
       #### Bulk single biopsy
       if (ncol(data) == 3) {
         default_values_load_genotype()
@@ -636,7 +802,6 @@ server <- function(input, output, session) {
         reshaped_data(
           acast(data, SAMPLE ~ GENE, value.var = "CCF", fill = 0)
         )
-        
 
         output$binarization <- renderUI({
           numericInput("binarization", "Filter to binarize", value = 1, 
@@ -647,7 +812,6 @@ server <- function(input, output, session) {
         })
         
         bulk_single_case()
-
         
       } else if (ncol(data) == 4) {   #### Bulk multipla biopsia o single cell 
         if (colnames(data)[2]=="REGION") {
@@ -1028,19 +1192,32 @@ server <- function(input, output, session) {
         showNotification("Nessun DAG", type = "error")
       } else {
         grafo <- graph_from_adjacency_matrix(selected_result)
-        output$graph_inference <- renderPlot({
+        
+        output$graph_inference <- renderVisNetwork({
           grafo <- graph_from_adjacency_matrix(selected_result)
           
           nodi_da_rimuovere <- V(grafo)[degree(grafo, mode = "in") == 0 & 
-                                          degree(grafo, mode = "out") == 0]
+                                        degree(grafo, mode = "out") == 0]
           grafo <- delete.vertices(grafo, nodi_da_rimuovere)
-          plot(grafo, layout = layout_with_fr, edge.arrow.size = 0.5, 
-               vertex.label.dist = 0.5, vertex.label.cex = 1.2)
+          
+
+          nodes <- as_tibble(get.vertex.attribute(grafo))
+          colnames(nodes) <- "id"
+          nodes <- data.frame(nodes, label= nodes$id)
+          edges <- as_tibble(as_edgelist(grafo))
+          colnames(edges) <- c("from", "to")
+
+          if (input$visualize_inference == 'poset') {
+            generateVisNetwork(nodes, edges, "other", "Inference output")
+          } else {
+            generateVisNetwork(nodes, edges, "other", "Inference output")
+          }
+          
         })
-        
       }
     }
   })
+
 
 
   ############# FASE SALVATAGGIO  ############################################## 

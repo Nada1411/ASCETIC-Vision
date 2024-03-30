@@ -12,6 +12,7 @@ library(igraph)
 library(shinycssloaders)
 library("bsplus")
 library(shinydashboard)
+library(visNetwork)
 
 shinyUI(
   
@@ -79,6 +80,10 @@ shinyUI(
           }
         
           #restarts {
+            border-radius: 5px;
+          }
+          
+          #nresampling {
             border-radius: 5px;
           }
           
@@ -150,7 +155,7 @@ shinyUI(
           
           .skin-blue .main-sidebar .sidebar .sidebar-menu a:hover{
               background-color: #79A0B3;
-              color: ECF0F5;
+              color: #ECF0F5;
           }
         ")
         ),
@@ -164,10 +169,12 @@ shinyUI(
             fluidRow(
               style = "display: flex; justify-content: center; margin-top: 40px;", 
               column(3,
-                     actionButton("loadProjBtn", "Load existing project", class = "custom-button")
+                     actionButton("loadProjBtn", "Load existing project", 
+                                  class = "custom-button")
               ),
               column(3,offset = 1,
-                     actionButton("create_project_button", "Create New Project", class = "custom-button")
+                     actionButton("create_project_button", "Create New Project", 
+                                  class = "custom-button")
               )
             )
           )
@@ -208,6 +215,10 @@ shinyUI(
               ),
             ),
             DTOutput("dataTable2"),
+            conditionalPanel(
+              condition = "output.dataTable2",
+              tags$div(style = "height: 30px;")
+            ),
             conditionalPanel(
               condition = "input.loadBtn > 0 || input.loadProjBtn > 0",
               class = "text-center",
@@ -250,7 +261,7 @@ shinyUI(
                      tags$div(
                        checkboxInput("resamplingFlag", 
                                      HTML("<strong>Resampling</strong>")),
-                       style = "margin-top: 35px;", width = "500px"
+                       style = "margin-top: 45px;", width = "500px"
                      ),
                      conditionalPanel(
                        condition = "input.resamplingFlag == true",
@@ -263,9 +274,13 @@ shinyUI(
               ),
             ),
             actionButton("submitBtn", "Invia", class = "custom-button"),
+            tags$div(style = "height: 40px;"),
             uiOutput("visualize_inference"),
             DTOutput("selected_result_output"),
-            plotOutput("graph_inference"),
+            div(
+              style = "display: flex; justify-content: center; margin-top: 50px;",
+              visNetworkOutput("graph_inference", width = "50%", height = "400px")
+            ),
             uiOutput("interruptButton"),
             uiOutput("spinner"),
             style = "margin-top: 30px;"
