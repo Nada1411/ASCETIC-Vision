@@ -177,45 +177,68 @@ server <- function(input, output, session) {
  
   # selection/deletion of row and column
   modify_reshaped_data <- function(reshaped_data) {
+    # Inizializza reactiveValues per tracciare le colonne e le righe eliminate
+    rv <- reactiveValues(deletedColumns = character(0), deletedRows = character(0))
     
-    if(is.null(input$DeleteColumn)) {
-      output$dataTable <- renderDT({
-        datatable(orig(), options = list(scrollX = TRUE), selection = "single")
-      })
-      output$heatmapPlot <- renderPlotly({
-        generate_heatmap_plot(orig())
-      })
-    }
+    observe({
+      # Verifica se input$DeleteColumn è NULL o vuoto e aggiorna rv$deletedColumns
+      if (is.null(input$DeleteColumn) || length(input$DeleteColumn) == 0) {
+        rv$deletedColumns <- character(0)
+      } else {
+        rv$deletedColumns <- input$DeleteColumn
+      }
+    })
     
-    observeEvent(input$DeleteColumn, { 
+    observe({
+      # Verifica se input$DeleteRow è NULL o vuoto e aggiorna rv$deletedRows
+      if (is.null(input$DeleteRow) || length(input$DeleteRow) == 0) {
+        rv$deletedRows <- character(0)
+      } else {
+        rv$deletedRows <- input$DeleteRow
+      }
+    })
+    
+    observe({
       reshaped_data <- as.data.frame(reshaped_data)
-      columns_to_delete <- which(colnames(reshaped_data) == input$DeleteColumn)
-      reshaped_data <- reshaped_data[, -columns_to_delete, drop = FALSE]
+      
+      # Gestisci l'eliminazione delle colonne basandoti su rv$deletedColumns
+      if (length(rv$deletedColumns) > 0) {
+        columns_to_delete <- match(rv$deletedColumns, colnames(reshaped_data))
+        reshaped_data <- reshaped_data[, -columns_to_delete, drop = FALSE]
+      }
+      
+      # Gestisci l'eliminazione delle righe basandoti su rv$deletedRows
+      if (length(rv$deletedRows) > 0) {
+        reshaped_data <- reshaped_data %>%
+          dplyr::slice(-which(rownames(reshaped_data) %in% rv$deletedRows))
+      }
+      
       reshaped_data <- as.matrix(reshaped_data)
+      
       output$dataTable <- renderDT({
         datatable(reshaped_data, options = list(scrollX = TRUE), selection = "single")
       })
+      
       output$heatmapPlot <- renderPlotly({
         generate_heatmap_plot(reshaped_data)
       })
     })
     
-      
-    observeEvent(input$DeleteRow, { 
-      reshaped_data <- as.data.frame(reshaped_data)
-       reshaped_data <- reshaped_data %>%
-         slice(-which(rownames(reshaped_data) %in% input$DeleteRow))
-      reshaped_data <- as.matrix(reshaped_data)
-      output$dataTable <- renderDT({
-        datatable(reshaped_data, options = list(scrollX = TRUE), 
-                  selection ="single")
-      })
-      output$heatmapPlot <- renderPlotly({
-        generate_heatmap_plot(reshaped_data)
-      })
-    })
     return(reshaped_data)
   }
+  
+  
+  
+  update_outputs <- function(reshaped_data) {
+    output$dataTable <- renderDT({
+      datatable(reshaped_data, options = list(scrollX = TRUE), selection = "single")
+    })
+    output$heatmapPlot <- renderPlotly({
+      generate_heatmap_plot(reshaped_data)
+    })
+  }
+  
+  
   
   
   observe_data_modification <- function(reshaped_data) {
