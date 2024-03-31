@@ -23,7 +23,7 @@ library(visNetwork)
 
 server <- function(input, output, session) {
   
-  ############################ Variables  ######################################
+############################ Variables  ######################################
 
   reshaped_data2 <- reactiveVal(NULL)
   selected_folder <- reactiveVal(NULL)
@@ -39,16 +39,17 @@ server <- function(input, output, session) {
   ranges <- reactiveValues(x = NULL, y = NULL)
   ranges <- reactiveValues(x = NULL, y = NULL)
   orig <- reactiveVal(NULL)
+  rv <- reactiveValues(deletedColumns = character(0), deletedRows = character(0))
 
-  ############################ Function  #######################################
+############################ Function  #######################################
   
   #funzione che reimposta tutti i valori nulli in una pagina
   default_values_load_genotype <- function() {
     output$directoryInput <- renderUI(NULL)
     output$binarization_perc <- renderUI(NULL)
     output$binarization <- renderUI(NULL)
-    output$DeleteRow <- renderUI(NULL)
-    output$DeleteColumn <- renderUI(NULL)
+    updateSelectInput(session, "DeleteColumn", selected = character(0))
+    updateSelectInput(session, "DeleteRow", selected = character(0))
     output$dataFile2 <- renderUI(NULL)
     output$loadBtn2 <- renderUI(NULL)
     output$dataTable <- renderDataTable(NULL)
@@ -66,14 +67,15 @@ server <- function(input, output, session) {
     output$visualize_inference <- NULL
     output$graph_inference <- NULL
     orig <- reactiveVal(NULL)
+    rv <- reactiveValues(deletedColumns = character(0), deletedRows = character(0))
   }
   
   default_values_create_project <- function() {
     output$directoryInput <- renderUI(NULL)
     output$binarization_perc <- renderUI(NULL)
     output$binarization <- renderUI(NULL)
-    output$DeleteRow <- renderUI(NULL)
-    output$DeleteColumn <- renderUI(NULL)
+    updateSelectInput(session, "DeleteColumn", selected = character(0))
+    updateSelectInput(session, "DeleteRow", selected = character(0))
     output$dataFile2 <- renderUI(NULL)
     output$loadBtn2 <- renderUI(NULL)
     output$dataTable <- renderDataTable(NULL)
@@ -92,6 +94,7 @@ server <- function(input, output, session) {
     output$visualize_inference <- NULL
     output$graph_inference <- NULL
     orig <- reactiveVal(NULL)
+    rv <- reactiveValues(deletedColumns = character(0), deletedRows = character(0))
   }
   
   
@@ -177,55 +180,35 @@ server <- function(input, output, session) {
  
   # selection/deletion of row and column
   modify_reshaped_data <- function(reshaped_data) {
-    # Inizializza reactiveValues per tracciare le colonne e le righe eliminate
-    rv <- reactiveValues(deletedColumns = character(0), deletedRows = character(0))
-    
     observe({
-      # Verifica se input$DeleteColumn è NULL o vuoto e aggiorna rv$deletedColumns
-      if (is.null(input$DeleteColumn) || length(input$DeleteColumn) == 0) {
-        rv$deletedColumns <- character(0)
-      } else {
-        rv$deletedColumns <- input$DeleteColumn
-      }
-    })
-    
-    observe({
-      # Verifica se input$DeleteRow è NULL o vuoto e aggiorna rv$deletedRows
-      if (is.null(input$DeleteRow) || length(input$DeleteRow) == 0) {
-        rv$deletedRows <- character(0)
-      } else {
-        rv$deletedRows <- input$DeleteRow
-      }
-    })
-    
-    observe({
-      reshaped_data <- as.data.frame(reshaped_data)
+      reshaped_data_df <- as.data.frame(reshaped_data) 
       
-      # Gestisci l'eliminazione delle colonne basandoti su rv$deletedColumns
-      if (length(rv$deletedColumns) > 0) {
-        columns_to_delete <- match(rv$deletedColumns, colnames(reshaped_data))
-        reshaped_data <- reshaped_data[, -columns_to_delete, drop = FALSE]
+      if (!is.null(input$DeleteColumn) && length(input$DeleteColumn) > 0) {
+        if (all(input$DeleteColumn %in% colnames(reshaped_data_df))) {
+          reshaped_data_df <- reshaped_data_df[, !colnames(reshaped_data_df) %in% input$DeleteColumn, drop = FALSE]
+        }
       }
       
-      # Gestisci l'eliminazione delle righe basandoti su rv$deletedRows
-      if (length(rv$deletedRows) > 0) {
-        reshaped_data <- reshaped_data %>%
-          dplyr::slice(-which(rownames(reshaped_data) %in% rv$deletedRows))
+      if (!is.null(input$DeleteRow) && length(input$DeleteRow) > 0) {
+        if (all(input$DeleteRow %in% rownames(reshaped_data_df)) || all(as.numeric(input$DeleteRow) %in% 1:nrow(reshaped_data_df))) {
+          reshaped_data_df <- reshaped_data_df[!rownames(reshaped_data_df) %in% input$DeleteRow, , drop = FALSE]
+        }
       }
       
-      reshaped_data <- as.matrix(reshaped_data)
+      reshaped_data_matrix <- as.matrix(reshaped_data_df)
       
       output$dataTable <- renderDT({
-        datatable(reshaped_data, options = list(scrollX = TRUE), selection = "single")
+        datatable(reshaped_data_matrix, options = list(scrollX = TRUE), selection = "single")
       })
       
       output$heatmapPlot <- renderPlotly({
-        generate_heatmap_plot(reshaped_data)
+        generate_heatmap_plot(reshaped_data_matrix)
       })
     })
     
     return(reshaped_data)
   }
+  
   
   
   
@@ -566,7 +549,7 @@ server <- function(input, output, session) {
   
   
   
-  #################### Load or create project  #################################
+############################ Load or create project  #################################
   
   ##Create
   
@@ -670,7 +653,6 @@ server <- function(input, output, session) {
               data <- read.csv(file_directory, row.names = 1)
               data <- as.matrix(data)
               reshaped_data(data)
-              
               output$dataTable <- renderDT({
                 datatable(data, options = list(scrollX = TRUE), selection ="single")
               })
@@ -707,15 +689,8 @@ server <- function(input, output, session) {
                     numericInput("binarization", "Filter to binarize", 
                                  value = val_bin, min = 0, max = 1, step = 0.01)
                   })
-                } else if (parametro == "del_col") {
-                  output$DeleteColumn <- render_delete_column_ui("DeleteColumn", 
-                                                                 "Delete column", 
-                                                                 reshaped_data())
-                } else if (parametro == "del_row") {
-                  output$DeleteRow <- render_delete_row_ui("DeleteRow", 
-                                                           "Delete row", 
-                                                           reshaped_data())
-                } else if (parametro == "flag_resampling") {
+                }
+                  else if (parametro == "flag_resampling") {
                   updateCheckboxInput(session, "resamplingFlag", 
                                       value = as.logical(valore))
                 } else if (parametro == "nresampling") {
@@ -784,7 +759,7 @@ server <- function(input, output, session) {
   
   
 
-################# Input data  ##################################################
+############################ Input data  ##################################################
   
   
   # Displaying the resampling file, in the case where there are three columns 
@@ -986,7 +961,7 @@ server <- function(input, output, session) {
   })
 
   
-  ############## Inference  ####################################################
+############################ Inference  ####################################################
   
   # filter the genotype table according to the case
   observeEvent(input$submitBtn, {
@@ -1243,7 +1218,7 @@ server <- function(input, output, session) {
 
 
 
-  ############# FASE SALVATAGGIO  ############################################## 
+############################ FASE SALVATAGGIO  ############################################## 
 
   saveData <- function(data, nome) {
     write.csv(data, nome, row.names=TRUE)
