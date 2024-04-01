@@ -190,7 +190,7 @@ shinyUI(
                          shiny_iconlink() %>%
                            bs_embed_popover(title = "Genotipo")
                        ),
-                     actionButton("loadBtn", "Load", class = "custom-button")
+                     actionButton("loadBtn", "Load", class = "custom-button", style = "margin-bottom: 25px;")
               ),
               column(6,
                      uiOutput("dataFile2"),
@@ -263,14 +263,7 @@ shinyUI(
                                      HTML("<strong>Resampling</strong>")),
                        style = "margin-top: 45px;", width = "500px"
                      ),
-                     conditionalPanel(
-                       condition = "input.resamplingFlag == true",
-                       tags$div(
-                         numericInput("nresampling", 
-                                      "Number of samplings", 3, min = 3),
-                         style = "margin-top: 25px;"
-                       )
-                     )
+                     uiOutput("nresampling", style = "margin-top: 25px;"),
               ),
             ),
             actionButton("submitBtn", "Invia", class = "custom-button"),
@@ -278,11 +271,10 @@ shinyUI(
             uiOutput("visualize_inference"),
             DTOutput("selected_result_output"),
             div(
-              style = "display: flex; justify-content: center; margin-top: 50px;",
+              style = "display: flex; justify-content: center; margin-top: -450px;",
               visNetworkOutput("graph_inference", width = "50%", height = "400px")
             ),
             uiOutput("interruptButton"),
-            uiOutput("spinner"),
             style = "margin-top: 30px;"
           )
         ),

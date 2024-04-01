@@ -74,15 +74,12 @@ server <- function(input, output, session) {
     output$directoryInput <- renderUI(NULL)
     output$binarization_perc <- renderUI(NULL)
     output$binarization <- renderUI(NULL)
-    updateSelectInput(session, "DeleteColumn", selected = character(0))
-    updateSelectInput(session, "DeleteRow", selected = character(0))
     output$dataFile2 <- renderUI(NULL)
     output$loadBtn2 <- renderUI(NULL)
     output$dataTable <- renderDataTable(NULL)
     output$dataTable2 <- renderDataTable(NULL)
     output$heatmapPlot <- plotly::renderPlotly({NULL})
     output$switchViewBtn <- renderUI(NULL)
-    output$visualize_inference <- renderDataTable(NULL)
     output$selected_result_output <- renderDataTable(NULL)
     output$graph_inference <- renderDataTable(NULL)
     updateCheckboxInput(session, "resamplingFlag", value = FALSE)
@@ -95,6 +92,9 @@ server <- function(input, output, session) {
     output$graph_inference <- NULL
     orig <- reactiveVal(NULL)
     rv <- reactiveValues(deletedColumns = character(0), deletedRows = character(0))
+    output$DeleteColumn <- NULL
+    output$DeleteRow <- NULL
+    output$content <- NULL
   }
   
   
@@ -131,57 +131,60 @@ server <- function(input, output, session) {
   # Management click on genotype table and visualization of POSET
   observe_table_cell_clicked <- function(reshaped_data) {
     observeEvent(input$dataTable_cell_clicked, {
-      info <- input$dataTable_cell_clicked
-
-      if (!is.null(info)) {
-        row_index <- info$row
-        selected_genes <- names(which(reshaped_data[row_index, ] != 0))
-        poset_graph <- NULL
-        if (length(selected_genes) >= 2) {
-          sorted_genes <- names(sort(reshaped_data[row_index, selected_genes], 
-                                     decreasing = TRUE))
-          sorted_genes <- unlist(lapply(seq_along(sorted_genes), 
-                                        function(i) rep(sorted_genes[i], 
-                                                        each = 2)))
-          sorted_genes <- sorted_genes[-c(1, length(sorted_genes))]
-          
-          poset_graph <- make_graph(edges = sorted_genes, directed = TRUE)
-        }
-        
-        
-        output$posetGraph <- renderVisNetwork({
-          
-          nodes <- as_tibble(get.vertex.attribute(poset_graph))
-          colnames(nodes) <- "id"
-          nodes <- data.frame(nodes, label= nodes$id)
-          edges <- as_tibble(as_edgelist(poset_graph))
-          colnames(edges) <- c("from", "to")
+      if (case()=="bulk_single") {
+        info <- input$dataTable_cell_clicked
+  
+        if (!is.null(info)) {
+          row_index <- info$row
+          selected_genes <- names(which(reshaped_data[row_index, ] != 0))
+          poset_graph <- NULL
+          if (length(selected_genes) >= 2) {
+            sorted_genes <- names(sort(reshaped_data[row_index, selected_genes], 
+                                       decreasing = TRUE))
+            sorted_genes <- unlist(lapply(seq_along(sorted_genes), 
+                                          function(i) rep(sorted_genes[i], 
+                                                          each = 2)))
+            sorted_genes <- sorted_genes[-c(1, length(sorted_genes))]
+            
+            poset_graph <- make_graph(edges = sorted_genes, directed = TRUE)
+          }
           
           
-          generateVisNetwork(nodes, edges, "poset", "Poset")
-        })
-
-        
-        output$content <- renderUI({
-          if (!is.null(poset_graph) && length(poset_graph) > 0) {
-            tagList(
-              tags$hr(),
-              div(
-                style = "display: flex; justify-content: center; margin-top: 50px;",
-                visNetworkOutput("posetGraph", width = "50%", height = "400px")
+          output$posetGraph <- renderVisNetwork({
+            
+            nodes <- as_tibble(get.vertex.attribute(poset_graph))
+            colnames(nodes) <- "id"
+            nodes <- data.frame(nodes, label= nodes$id)
+            edges <- as_tibble(as_edgelist(poset_graph))
+            colnames(edges) <- c("from", "to")
+            
+            
+            generateVisNetwork(nodes, edges, "poset", "Poset")
+          })
+  
+          
+          output$content <- renderUI({
+            if (!is.null(poset_graph) && length(poset_graph) > 0) {
+              tagList(
+                tags$hr(),
+                div(
+                  style = "display: flex; justify-content: center; margin-top: 50px;",
+                  visNetworkOutput("posetGraph", width = "50%", height = "400px")
+                )
               )
-            )
-          } 
-        })
-      }
+            } 
+          })
+        }
+    }
     })
+  
   }
   
  
   # selection/deletion of row and column
   modify_reshaped_data <- function(reshaped_data) {
     observe({
-      reshaped_data_df <- as.data.frame(reshaped_data) 
+      reshaped_data_df <- as.data.frame(reshaped_data) # Assicurati che sia un dataframe
       
       if (!is.null(input$DeleteColumn) && length(input$DeleteColumn) > 0) {
         if (all(input$DeleteColumn %in% colnames(reshaped_data_df))) {
@@ -386,7 +389,6 @@ server <- function(input, output, session) {
     }
     else  {
       output$interruptButton <- renderUI({})
-      output$spinner <- renderUI({})
     }
   }
   
@@ -566,21 +568,26 @@ server <- function(input, output, session) {
   
   # Show the table with the names of existing projects
   output$projectList <- renderDT({
-    datatable(project_names(), rownames = FALSE, colnames = c("Project name"), 
+    project_data <- project_names()
+    if (nrow(project_data) == 0) {
+      project_data <- data.frame(Project_name = "There are no previously saved projects")
+    }
+    datatable(project_data, rownames = FALSE, colnames = c("Project name"), 
               selection ="single", options = list(
-    initComplete = JS(
-      "function(settings, json) {",
-      "$(this.api().table().header()).css({'background-color': '#232E33', 
-      'color': '#fff'});",
-      "}")
-  )) 
+                initComplete = JS(
+                  "function(settings, json) {",
+                  "$(this.api().table().header()).css({'background-color': '#232E33', 
+                'color': '#fff'});",
+                  "}")
+              )) 
   })
+  
   
   
   ##Load
   
   observeEvent(input$loadProjBtn, {
-    default_values_create_project()
+    default_values_load_genotype()
     if (is.null(input$projectList_cell_clicked$row) || 
         is.null(input$projectList_cell_clicked$col)) {
       showNotification("Select the project you want to upload", type = "error")
@@ -1001,28 +1008,27 @@ server <- function(input, output, session) {
   observeEvent(input$resamplingFlag, {
     # Check whether the resampling flag has been activated.
     if (input$resamplingFlag) {
-      # if files were not uploaded in the previous case it gives error
-      if (is.null(case())) {
+      # Check if case is not null and if it's bulk_single, whether the file is loaded
+      if (!is.null(case()) && (case() != "bulk_single" || !is.null(input$dataTable2) || !is.null(reshaped_data2()))) {
+        output$nresampling <- renderUI({
+          numericInput("nresampling", "Number of samplings", 3, min = 3)
+        })
+      } else {
+        # If the condition is not met, show a warning
+        showNotification("Load the resampling file in the previous step", type = "warning")
+        # Update resamplingFlag back to FALSE
         updateCheckboxInput(session, "resamplingFlag", value = FALSE)
-        showNotification("Load the files in the previous step", type = "error")
       }
-    #otherwise we evaluate the case, if we are in the first check that the 
-    #resampling file was loaded in the previous step
-     else if (case() == "bulk_single") {
-        if (is.null(input$dataTable2) & is.null(reshaped_data2())) {
-          # If the file has not been uploaded, turn off the flag and show an error message
-          updateCheckboxInput(session, "resamplingFlag", value = FALSE)
-          showNotification("Load the resampling file in the previous step", 
-                           type = "error")
-        }
-      }
-    }
-    else {
-      output$nresampling <- renderUI({numericInput("nresampling", 
-                                                   "Number of samplings", 
-                                                   3, min = 3)})
+    } else {
+      # If resamplingFlag is off, remove the nresampling input
+      output$nresampling <- NULL
     }
   })
+  
+
+
+  
+  
   
   
   observeEvent(input$interruptButton, {
@@ -1163,7 +1169,7 @@ server <- function(input, output, session) {
   observeEvent(input$visualize_inference, {
     
     res <- resampling_res()
-    
+    output$selected_result_output <- NULL
     col_names <- colnames(res$dataset)
     
     if (input$visualize_inference %in% names(res)) {
@@ -1172,49 +1178,46 @@ server <- function(input, output, session) {
       selected_result <- res$inference[[input$visualize_inference]]
     }
     
-    if (input$visualize_inference=="rankingEstimate") {
-      output$graph_inference <- ({NULL})
+    if (input$visualize_inference == "rankingEstimate") {
+      output$graph_inference <- NULL
+      
       output$selected_result_output <- renderDT({
         selected_result[, "variable"] <- row.names(selected_result)
-        selected_result[, "rank"] <- (as.integer(selected_result[, "rank"])+1) 
+        selected_result[, "rank"] <- (as.integer(selected_result[, "rank"]) + 1) 
         colnames(selected_result)[1] <- "genes"
         datatable(selected_result, options = list(scrollX = TRUE), 
                   rownames = FALSE, selection ="single")
       })
-    }
-    else {
-      output$selected_result_output <- ({NULL})
+    } else {
       colnames(selected_result) <- col_names
       rownames(selected_result) <- col_names
-      if(all(selected_result == 0)) {
-        showNotification("Nessun DAG", type = "error")
+      if (all(selected_result == 0)) {
+        showNotification("No DAG available", type = "message")
+        output$graph_inference <- NULL
       } else {
         grafo <- graph_from_adjacency_matrix(selected_result)
         
         output$graph_inference <- renderVisNetwork({
-          grafo <- graph_from_adjacency_matrix(selected_result)
-          
           nodi_da_rimuovere <- V(grafo)[degree(grafo, mode = "in") == 0 & 
-                                        degree(grafo, mode = "out") == 0]
+                                          degree(grafo, mode = "out") == 0]
           grafo <- delete.vertices(grafo, nodi_da_rimuovere)
           
-
           nodes <- as_tibble(get.vertex.attribute(grafo))
           colnames(nodes) <- "id"
           nodes <- data.frame(nodes, label= nodes$id)
           edges <- as_tibble(as_edgelist(grafo))
           colnames(edges) <- c("from", "to")
-
+          
           if (input$visualize_inference == 'poset') {
             generateVisNetwork(nodes, edges, "other", "Inference output")
           } else {
             generateVisNetwork(nodes, edges, "other", "Inference output")
           }
-          
         })
       }
     }
   })
+  
 
 
 
@@ -1334,7 +1337,7 @@ server <- function(input, output, session) {
         saveData(matrice_dataframe , directory_file)
       }
       
-      showNotification("Completed", type = "error")
+      showNotification("Project saved", type = "success")
     }
     else {
       showNotification("Nothing to save", type = "error")
