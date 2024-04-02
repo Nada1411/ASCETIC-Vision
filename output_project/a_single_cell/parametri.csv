@@ -1,0 +1,11 @@
+"","Nome","Valore"
+"1","binarization","1"
+"2","del_col","DNMT3A"
+"3","del_row",NA
+"4","flag_resampling","FALSE"
+"5","nresampling",NA
+"6","restarts","10"
+"7","regularization","aic"
+"8","command","hc"
+"9","seed","12345"
+"10","output_inference","binarization"

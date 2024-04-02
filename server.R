@@ -40,7 +40,21 @@ server <- function(input, output, session) {
   ranges <- reactiveValues(x = NULL, y = NULL)
   orig <- reactiveVal(NULL)
   rv <- reactiveValues(deletedColumns = character(0), deletedRows = character(0))
+  app_activated <- reactiveVal(FALSE)
+  
 
+  observe({
+    if (!app_activated()) {
+      app_activated(TRUE)
+    }
+  })
+  
+  output$dataFile <- renderUI({
+    if (app_activated()) {
+      fileInput("dataFile", "Genotype")
+    } 
+  })
+  
 ############################ Function  #######################################
   
   #funzione che reimposta tutti i valori nulli in una pagina
@@ -53,7 +67,7 @@ server <- function(input, output, session) {
     output$dataFile2 <- renderUI(NULL)
     output$loadBtn2 <- renderUI(NULL)
     output$dataTable <- renderDataTable(NULL)
-    output$dataTable2 <- renderDataTable(NULL)
+    output$dataTable2 <- NULL
     output$heatmapPlot <- plotly::renderPlotly(NULL)
     output$visualize_inference <- renderDataTable(NULL)
     output$selected_result_output <- renderDataTable(NULL)
@@ -68,6 +82,8 @@ server <- function(input, output, session) {
     output$graph_inference <- NULL
     orig <- reactiveVal(NULL)
     rv <- reactiveValues(deletedColumns = character(0), deletedRows = character(0))
+    app_activated(FALSE)
+    reshaped_data2(NULL)
   }
   
   default_values_create_project <- function() {
@@ -76,8 +92,8 @@ server <- function(input, output, session) {
     output$binarization <- renderUI(NULL)
     output$dataFile2 <- renderUI(NULL)
     output$loadBtn2 <- renderUI(NULL)
-    output$dataTable <- renderDataTable(NULL)
-    output$dataTable2 <- renderDataTable(NULL)
+    output$dataTable <- NULL
+    output$dataTable2 <- NULL
     output$heatmapPlot <- plotly::renderPlotly({NULL})
     output$switchViewBtn <- renderUI(NULL)
     output$selected_result_output <- renderDataTable(NULL)
@@ -95,6 +111,8 @@ server <- function(input, output, session) {
     output$DeleteColumn <- NULL
     output$DeleteRow <- NULL
     output$content <- NULL
+    app_activated(FALSE)
+    reshaped_data2(NULL)
   }
   
   
@@ -557,6 +575,7 @@ server <- function(input, output, session) {
   
   # Function to change the tabPanel to "Data Input" when the "Create New Project" 
   observeEvent(input$create_project_button, {
+    rv$dataFile=NULL
     default_values_create_project()
     updateTabItems(session, "sidebarMenu", "input")
   })
@@ -697,7 +716,22 @@ server <- function(input, output, session) {
                                  value = val_bin, min = 0, max = 1, step = 0.01)
                   })
                 }
-                  else if (parametro == "flag_resampling") {
+                else if (parametro =="del_col") {
+                  vettore <- unlist(strsplit(gsub("\"", "", valore), ",\\s*"))
+                  del_col <- vettore[vettore != ""]
+                  output$DeleteColumn <- render_delete_column_ui("DeleteColumn", 
+                                                                 "Delete column", 
+                                                                 reshaped_data(),
+                                                                 selected_columns = del_col)
+                  
+                }else if (parametro =="del_row") {
+                  vettore <- unlist(strsplit(gsub("\"", "", valore), ",\\s*"))
+                  del_row <- vettore[vettore != ""]
+                  output$DeleteRow <- render_delete_row_ui("DeleteRow", 
+                                                           "Delete row", 
+                                                           reshaped_data(),
+                                                           selected_rows = del_row)
+                }else if (parametro == "flag_resampling") {
                   updateCheckboxInput(session, "resamplingFlag", 
                                       value = as.logical(valore))
                 } else if (parametro == "nresampling") {
@@ -739,33 +773,25 @@ server <- function(input, output, session) {
 
 
   
-  # Function to render UI for selecting columns
-  render_select_column_ui <- function(input_id, label, data) {
+
+  # Function to render UI for deleting columns
+  render_delete_column_ui <- function(input_id, label, data, selected_columns = NULL) {
     output <- renderUI({
-      selectInput(input_id, label, choices = colnames(data), multiple = TRUE)
+      selectInput(input_id, label, choices = colnames(data), selected = selected_columns, multiple = TRUE)
     })
     return(output)
   }
   
-  # Function to render UI for deleting columns
-  render_delete_column_ui <- function(input_id, label, data) {
-    output <- renderUI({
-      selectInput(input_id, label, choices = colnames(data), multiple = TRUE)
-    })
-    return(output)
-  }
   
   
   # Function to render UI for deleting rows
-  render_delete_row_ui <- function(input_id, label, data) {
-    output <- renderUI({
-      selectInput(input_id, label, choices = rownames(data), multiple = TRUE)
-    })
-    return(output)
+  render_delete_row_ui <- function(input_id, label, data, selected_rows = NULL) {
+      output <- renderUI({
+        selectInput(input_id, label, choices = rownames(data), selected = selected_rows, multiple = TRUE)
+      })
+      return(output)
   }
   
-  
-
 ############################ Input data  ##################################################
   
   
@@ -838,11 +864,14 @@ server <- function(input, output, session) {
           
           modified_data <- reshaped_data()
           
+          
           output$DeleteColumn <- render_delete_column_ui("DeleteColumn", 
                                                          "Delete column", 
                                                          reshaped_data())
-          output$DeleteRow <- render_delete_row_ui("DeleteRow", "Delete row", 
+          output$DeleteRow <- render_delete_row_ui("DeleteRow", 
+                                                   "Delete row", 
                                                    reshaped_data())
+        
           
           observe({
             
@@ -905,18 +934,18 @@ server <- function(input, output, session) {
           reshaped_data(data %>%
             column_to_rownames(var = "PATIENT"))
           
-          modified_data <- reshaped_data()
-          
+
           output$DeleteColumn <- render_delete_column_ui("DeleteColumn", 
                                                          "Delete column", 
                                                          reshaped_data())
+          
           output$DeleteRow <- render_delete_row_ui("DeleteRow", 
                                                    "Delete row", 
                                                    reshaped_data())
           
           observe({
             
-            modified_data <- modify_reshaped_data(modified_data)
+            modified_data <- modify_reshaped_data(reshaped_data())
             
 
             output$dataTable <- renderDT({
@@ -1039,134 +1068,141 @@ server <- function(input, output, session) {
   
   #inference function
   observeEvent(input$submitBtn, {
+    tryCatch({
     
-    
-    nsampling <- input$nresampling
-
-    set.seed(input$seed)
-    
-    if (is.null(case())) {
-      showNotification("Load the files in the previous step", type = "error")
-    }
-    else if(case()=="bulk_single") {
-      if (input$resamplingFlag == FALSE) {
-        
-        interrupt(calculationInProgress())
-        
-        progress <- withProgress(
-          message = 'Ongoing calculation...',
-          detail = 'This may take some time...',
-          value = 0, {
-            res <- asceticCCF(
-              dataset = genotype_table(),
-              ccfDataset = reshaped_data(),
-              regularization = input$regularization,
-              command = input$command, 
-              restarts = input$restarts
-            )
-          }
-        )
-        
-        calculationInProgress(progress)
-        
-        interrupt(calculationInProgress())
-      }
-      else {
-        interrupt(calculationInProgress())
-        
-        progress <- withProgress(
-          message = 'Ongoing calculation...',
-          detail = 'This may take some time...',
-          value = 0, {
-            res <- asceticCCFResampling(
-              dataset = genotype_table(),
-              ccfDataset = reshaped_data(),
-              vafDataset = reshaped_data2(),
-              nsampling = nsampling,
-              regularization = input$regularization,
-              command = input$command, 
-              restarts = input$restarts
-            )
-          }
-        )
-        
-        calculationInProgress(progress)
-        
-        interrupt(calculationInProgress())
-      }
-    }
-    else if(case()=="bulk_multiple" || case() == "single_cell") {
-      
-      
-      if (is.null(selected_folder())) {
-        showNotification("Select the folder in the previous step", type = "error")
-      }
-      else if (input$resamplingFlag == FALSE) {
-        models <- readMatrixFiles(selected_folder())
-        interrupt(calculationInProgress())
-        
-        progress <- withProgress(
-          message = 'Ongoing calculation...',
-          detail = 'This may take some time...',
-          value = 0, {
-            res <- asceticPhylogenies(
-              dataset = genotype_table(),
-              models = models,
-              regularization = input$regularization,
-              command = input$command,
-              restarts = input$restarts
-            )
-          }
-        )
-        
-        calculationInProgress(progress)
-        
-        interrupt(calculationInProgress())
-        
-      }
-      else {
-        models <- readMatrixFiles(selected_folder())
-        interrupt(calculationInProgress())
-        
-        progress <- withProgress(
-          message = 'Ongoing calculation...',
-          detail = 'This may take some time...',
-          value = 0, {
-            res <- asceticPhylogeniesBootstrap(
-              dataset = genotype_table(),
-              models = models,
-              nsampling = nsampling,
-              regularization = input$regularization,
-              command = input$command,
-              restarts = input$restarts
-            )
-          }
-        )
-        
-        calculationInProgress(progress)
-        
-        interrupt(calculationInProgress())
-      }
-    }
-
-    resampling_res(res)
-
-    if(!is.null(res)) {
-
-      names_to_remove <- c("dataset", "models", "ccfDataset", "inference")
-
-      names <- setdiff(names(res), names_to_remove)
-      names <- c(names, names(res$inference))
-      
-      
-      output$visualize_inference <- renderUI({selectInput("visualize_inference", 
-                                                          "Output inference", 
-                                                          c(names))})
+      nsampling <- input$nresampling
   
-    }
+      set.seed(input$seed)
+      
+      if (is.null(case())) {
+        showNotification("Load the files in the previous step", type = "error")
+      }
+      else if(case()=="bulk_single") {
+        if (input$resamplingFlag == FALSE) {
+          
+          interrupt(calculationInProgress())
+          
+          progress <- withProgress(
+            message = 'Ongoing calculation...',
+            detail = 'This may take some time...',
+            value = 0, {
+              res <- asceticCCF(
+                dataset = genotype_table(),
+                ccfDataset = reshaped_data(),
+                regularization = input$regularization,
+                command = input$command, 
+                restarts = input$restarts
+              )
+            }
+          )
+          
+          calculationInProgress(progress)
+          
+          interrupt(calculationInProgress())
+        }
+        else {
+          interrupt(calculationInProgress())
+          
+          progress <- withProgress(
+            message = 'Ongoing calculation...',
+            detail = 'This may take some time...',
+            value = 0, {
+              res <- asceticCCFResampling(
+                dataset = genotype_table(),
+                ccfDataset = reshaped_data(),
+                vafDataset = reshaped_data2(),
+                nsampling = nsampling,
+                regularization = input$regularization,
+                command = input$command, 
+                restarts = input$restarts
+              )
+            }
+          )
+          
+          calculationInProgress(progress)
+          
+          interrupt(calculationInProgress())
+        }
+      }
+      else if(case()=="bulk_multiple" || case() == "single_cell") {
+        
+        
+        if (is.null(selected_folder())) {
+          showNotification("Select the folder in the previous step", type = "error")
+        }
+        else if (input$resamplingFlag == FALSE) {
+          models <- readMatrixFiles(selected_folder())
+          interrupt(calculationInProgress())
+          
+          progress <- withProgress(
+            message = 'Ongoing calculation...',
+            detail = 'This may take some time...',
+            value = 0, {
+              res <- asceticPhylogenies(
+                dataset = genotype_table(),
+                models = models,
+                regularization = input$regularization,
+                command = input$command,
+                restarts = input$restarts
+              )
+            }
+          )
+          
+          calculationInProgress(progress)
+          
+          interrupt(calculationInProgress())
+          
+        }
+        else {
+          models <- readMatrixFiles(selected_folder())
+          interrupt(calculationInProgress())
+          
+          progress <- withProgress(
+            message = 'Ongoing calculation...',
+            detail = 'This may take some time...',
+            value = 0, {
+              res <- asceticPhylogeniesBootstrap(
+                dataset = genotype_table(),
+                models = models,
+                nsampling = nsampling,
+                regularization = input$regularization,
+                command = input$command,
+                restarts = input$restarts
+              )
+            }
+          )
+          
+          calculationInProgress(progress)
+          
+          interrupt(calculationInProgress())
+        }
+      }
+  
+      resampling_res(res)
+  
+      if(!is.null(res)) {
+  
+        names_to_remove <- c("dataset", "models", "ccfDataset", "inference")
+  
+        names <- setdiff(names(res), names_to_remove)
+        names <- c(names, names(res$inference))
+        
+        
+        output$visualize_inference <- renderUI({selectInput("visualize_inference", 
+                                                            "Output inference", 
+                                                            c(names))})
+    
+      }
+      }, error = function(e) {
+        output$visualize_inference <- NULL
+        output$selected_result_output <- NULL
+        output$graph_inference <- NULL
+        showNotification("Select correct folder on previous page", type = "error")
+      })
   })
   
-  observeEvent(input$visualize_inference, {
+  observe({
+    req(input$visualize_inference)  # Assicurati che l'input sia presente
     
     res <- resampling_res()
     output$selected_result_output <- NULL
@@ -1195,6 +1231,7 @@ server <- function(input, output, session) {
         showNotification("No DAG available", type = "message")
         output$graph_inference <- NULL
       } else {
+        print("qui")
         grafo <- graph_from_adjacency_matrix(selected_result)
         
         output$graph_inference <- renderVisNetwork({
@@ -1209,14 +1246,16 @@ server <- function(input, output, session) {
           colnames(edges) <- c("from", "to")
           
           if (input$visualize_inference == 'poset') {
-            generateVisNetwork(nodes, edges, "other", "Inference output")
+            generateVisNetwork(nodes, edges, "other", "")
           } else {
-            generateVisNetwork(nodes, edges, "other", "Inference output")
+            generateVisNetwork(nodes, edges, "other", "")
           }
         })
       }
     }
   })
+  
+  
   
 
 
@@ -1337,7 +1376,7 @@ server <- function(input, output, session) {
         saveData(matrice_dataframe , directory_file)
       }
       
-      showNotification("Project saved", type = "success")
+      showNotification("Project saved", type = "message")
     }
     else {
       showNotification("Nothing to save", type = "error")

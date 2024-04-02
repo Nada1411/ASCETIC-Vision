@@ -58,10 +58,6 @@ shinyUI(
           #switchViewBtn {
             margin-top: 40px;  
           }
-
-          #dataTable2 {
-            margin-top: 60px;  
-          }
           
           #switchViewBtn {
             margin-top: -10px;  
@@ -185,11 +181,7 @@ shinyUI(
             style = "margin-left: 10px; margin-right: 10px; margin-top: 20px;",
             fluidRow(
               column(6,
-                     fileInput("dataFile", "Genotype") %>%
-                       shinyInput_label_embed(
-                         shiny_iconlink() %>%
-                           bs_embed_popover(title = "Genotipo")
-                       ),
+                     uiOutput("dataFile"),
                      actionButton("loadBtn", "Load", class = "custom-button", style = "margin-bottom: 25px;")
               ),
               column(6,
@@ -214,24 +206,50 @@ shinyUI(
                      uiOutput("binarization_perc")
               ),
             ),
+            conditionalPanel(
+              condition = "output.dataTable2",
+              tags$div("Resampling", style = "font-weight: bold; margin-top: 30px; margin-left: 0px; font-size: 17px; margin-bottom: 20px;"),  # Imposta il testo "Resampling" con stili CSS
+            ),
             DTOutput("dataTable2"),
             conditionalPanel(
               condition = "output.dataTable2",
               tags$div(style = "height: 30px;")
             ),
             conditionalPanel(
-              condition = "input.loadBtn > 0 || input.loadProjBtn > 0",
-              class = "text-center",
-              uiOutput("switchViewBtn")
+              condition = "output.dataTable2",
+              tags$div(style = "height: 30px;")
+            ),
+            fluidRow(
+              column(12,
+                     conditionalPanel(
+                       condition = "input.loadBtn > 0 || input.loadProjBtn > 0",
+                       class = "text-center",
+                       uiOutput("switchViewBtn")
+                     ),
+                     style = "margin-top: 30px;"  
+              )
             ),
             conditionalPanel(
-              condition = "input.switchViewBtn % 2 == 1",
-              DTOutput("dataTable")
+              condition = "output.dataTable",
+              tags$div("Genotype", style = "font-weight: bold; margin-top: 30px; margin-left: 0px; font-size: 17px; margin-bottom: 20px;"),  # Imposta il testo "Resampling" con stili CSS
             ),
-            conditionalPanel(
-              condition = "input.switchViewBtn % 2 == 0",
-              plotly::plotlyOutput("heatmapPlot")
+            fluidRow(
+              column(12,
+                     conditionalPanel(
+                       condition = "input.switchViewBtn % 2 == 1",
+                       DTOutput("dataTable")
+                     )
+              )
             ),
+            fluidRow(
+              column(12,
+                     conditionalPanel(
+                       condition = "input.switchViewBtn % 2 == 0",
+                       plotly::plotlyOutput("heatmapPlot")
+                     )
+              )
+            )
+            ,
             fluidRow(
               column(12, uiOutput("content"))
             )
@@ -270,8 +288,12 @@ shinyUI(
             tags$div(style = "height: 40px;"),
             uiOutput("visualize_inference"),
             DTOutput("selected_result_output"),
+            conditionalPanel(
+              condition = "output.graph_inference",
+              tags$div("Inference output", style = "font-weight: bold; margin-top: 30px; font-size: 17px; margin-bottom: 20px; text-align: center;"),
+            ),
             div(
-              style = "display: flex; justify-content: center; margin-top: -450px;",
+              style = "display: flex; justify-content: center;",
               visNetworkOutput("graph_inference", width = "50%", height = "400px")
             ),
             uiOutput("interruptButton"),
