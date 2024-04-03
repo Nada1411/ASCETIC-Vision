@@ -763,9 +763,12 @@ server <- function(input, output, session) {
               names_to_remove <- c("dataset", "models", "ccfDataset", "inference")
               names <- setdiff(names(res), names_to_remove)
               names <- c(names, names(res$inference))
-              output$visualize_inference <- renderUI({selectInput("visualize_inference", 
-                                                                  "Output inference", 
-                                                                  c(names))})
+              output$visualize_inference <- renderUI({
+                selectInput("visualize_inference", 
+                            "Output inference", 
+                            c(names),
+                            selected = "poset")  
+              })
             }
           }
         }    
@@ -1194,7 +1197,8 @@ server <- function(input, output, session) {
         
         output$visualize_inference <- renderUI({selectInput("visualize_inference", 
                                                             "Output inference", 
-                                                            c(names))})
+                                                            c(names),
+                                                            selected = "poset")})
     
       }
       }, error = function(e) {
@@ -1235,7 +1239,6 @@ server <- function(input, output, session) {
         showNotification("No DAG available", type = "message")
         output$graph_inference <- NULL
       } else {
-        print("qui")
         grafo <- graph_from_adjacency_matrix(selected_result)
         
         output$graph_inference <- renderVisNetwork({

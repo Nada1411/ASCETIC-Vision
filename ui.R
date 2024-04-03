@@ -146,7 +146,9 @@ shinyUI(
               background-color: #ECF0F5;
               color: #222D32;
           }
+                              
 
+          
           .skin-blue .main-sidebar .sidebar .sidebar-menu a:hover{
               background-color: #79A0B3;
               color: #ECF0F5;
@@ -284,27 +286,20 @@ shinyUI(
             actionButton("submitBtn", "Invia", class = "custom-button"),
             tags$div(style = "height: 40px;"),
             uiOutput("visualize_inference"),
-            DTOutput("selected_result_output"),
             conditionalPanel(
               condition = "output.graph_inference",
-              tags$div("Inference output", style = "font-weight: bold; margin-top: 30px; font-size: 17px; text-align: center;"),
-            ),
-            conditionalPanel(
-              condition = "output.graph_inference_top",
-              tags$div("Inference output", style = "font-weight: bold; margin-top: -430px; font-size: 17px; text-align: center;"),
+              tags$div("Inference output", style = "font-weight: bold; margin-top: 30px; font-size: 17px; margin-bottom: 20px; text-align: center;"),
             ),
             div(
-              id = "graph_inference_top_div",
-              style = "display: flex; justify-content: center; margin-top: -40px",
-              visNetworkOutput("graph_inference_top", width = "50%", height = "400px")
-            ),
-            div(
-              id = "graph_inference_div",
-              style = "display: flex; justify-content: center; margin-top: -350px",
+              style = "display: flex; justify-content: center;",
               visNetworkOutput("graph_inference", width = "50%", height = "400px")
             ),
             uiOutput("interruptButton"),
-            style = "margin-top: 30px;"
+            style = "margin-top: 30px;",
+            div(
+              style = "display: flex; justify-content: center; margin-top: -350px;",
+              DTOutput("selected_result_output")
+            ),
           )
         ),
         tabItem(
