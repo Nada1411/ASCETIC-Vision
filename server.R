@@ -66,7 +66,7 @@ server <- function(input, output, session) {
     updateSelectInput(session, "DeleteRow", selected = character(0))
     output$dataFile2 <- renderUI(NULL)
     output$loadBtn2 <- renderUI(NULL)
-    output$dataTable <- renderDataTable(NULL)
+    output$dataTable <- NULL
     output$dataTable2 <- NULL
     output$heatmapPlot <- plotly::renderPlotly(NULL)
     output$visualize_inference <- renderDataTable(NULL)
@@ -225,10 +225,14 @@ server <- function(input, output, session) {
       output$heatmapPlot <- renderPlotly({
         generate_heatmap_plot(reshaped_data_matrix)
       })
+      
+      # Rileva i clic sulle celle della tabella
+      observe_table_cell_clicked(reshaped_data_matrix)
     })
     
     return(reshaped_data)
   }
+  
   
   
   

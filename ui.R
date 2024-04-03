@@ -146,9 +146,7 @@ shinyUI(
               background-color: #ECF0F5;
               color: #222D32;
           }
-                              
 
-          
           .skin-blue .main-sidebar .sidebar .sidebar-menu a:hover{
               background-color: #79A0B3;
               color: #ECF0F5;
@@ -206,6 +204,39 @@ shinyUI(
                      uiOutput("binarization_perc")
               ),
             ),
+            fluidRow(
+              column(12,
+                     conditionalPanel(
+                       condition = "input.loadBtn > 0 || input.loadProjBtn > 0",
+                       uiOutput("switchViewBtn")
+                     ),
+                     style = "margin-top: 50px;"  
+              )
+            ),
+            conditionalPanel(
+              condition = "output.dataTable",
+              tags$div("Genotype", style = "font-weight: bold; margin-top: 30px; margin-left: 0px; font-size: 17px; margin-bottom: 20px;"),  
+            ),
+            fluidRow(
+              column(12,
+                     conditionalPanel(
+                       condition = "input.switchViewBtn % 2 == 1",
+                       plotly::plotlyOutput("heatmapPlot")
+                     )
+              )
+            ),
+            fluidRow(
+              column(12,
+                     conditionalPanel(
+                       condition = "input.switchViewBtn % 2 == 0",
+                       DTOutput("dataTable")
+                     )
+              )
+            )
+            ,
+            fluidRow(
+              column(12, uiOutput("content"))
+            ),
             conditionalPanel(
               condition = "output.dataTable2",
               tags$div("Resampling", style = "font-weight: bold; margin-top: 30px; margin-left: 0px; font-size: 17px; margin-bottom: 20px;"),  # Imposta il testo "Resampling" con stili CSS
@@ -218,40 +249,6 @@ shinyUI(
             conditionalPanel(
               condition = "output.dataTable2",
               tags$div(style = "height: 30px;")
-            ),
-            fluidRow(
-              column(12,
-                     conditionalPanel(
-                       condition = "input.loadBtn > 0 || input.loadProjBtn > 0",
-                       class = "text-center",
-                       uiOutput("switchViewBtn")
-                     ),
-                     style = "margin-top: 30px;"  
-              )
-            ),
-            conditionalPanel(
-              condition = "output.dataTable",
-              tags$div("Genotype", style = "font-weight: bold; margin-top: 30px; margin-left: 0px; font-size: 17px; margin-bottom: 20px;"),  # Imposta il testo "Resampling" con stili CSS
-            ),
-            fluidRow(
-              column(12,
-                     conditionalPanel(
-                       condition = "input.switchViewBtn % 2 == 1",
-                       DTOutput("dataTable")
-                     )
-              )
-            ),
-            fluidRow(
-              column(12,
-                     conditionalPanel(
-                       condition = "input.switchViewBtn % 2 == 0",
-                       plotly::plotlyOutput("heatmapPlot")
-                     )
-              )
-            )
-            ,
-            fluidRow(
-              column(12, uiOutput("content"))
             )
           )
         ),
@@ -290,10 +287,20 @@ shinyUI(
             DTOutput("selected_result_output"),
             conditionalPanel(
               condition = "output.graph_inference",
-              tags$div("Inference output", style = "font-weight: bold; margin-top: 30px; font-size: 17px; margin-bottom: 20px; text-align: center;"),
+              tags$div("Inference output", style = "font-weight: bold; margin-top: 30px; font-size: 17px; text-align: center;"),
+            ),
+            conditionalPanel(
+              condition = "output.graph_inference_top",
+              tags$div("Inference output", style = "font-weight: bold; margin-top: -430px; font-size: 17px; text-align: center;"),
             ),
             div(
-              style = "display: flex; justify-content: center;",
+              id = "graph_inference_top_div",
+              style = "display: flex; justify-content: center; margin-top: -40px",
+              visNetworkOutput("graph_inference_top", width = "50%", height = "400px")
+            ),
+            div(
+              id = "graph_inference_div",
+              style = "display: flex; justify-content: center; margin-top: -350px",
               visNetworkOutput("graph_inference", width = "50%", height = "400px")
             ),
             uiOutput("interruptButton"),
