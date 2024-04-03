@@ -1,5 +1,4 @@
 # server.R
-
 library(shiny)
 library(shinyjs)
 library("ASCETIC")
@@ -9,7 +8,6 @@ library(data.table)
 library(reshape2)
 library(dplyr)
 library(shinyFiles)
-library(igraph)
 library(POSetR)
 library(plotly)
 library(tibble)
@@ -20,29 +18,22 @@ library(igraph)
 library(visNetwork)
 
 
-
 server <- function(input, output, session) {
   
 ############################ Variables  ######################################
 
-  reshaped_data2 <- reactiveVal(NULL)
   selected_folder <- reactiveVal(NULL)
   directory_output <- reactiveVal(NULL)
   reshaped_data <- reactiveVal(NULL)
-  reshaped_data2 <- reactiveVal(NULL)
   genotype_table <- reactiveVal(NULL)
   case <- reactiveVal(NULL)
-  directory <- reactiveVal(NULL)
-  calculationInProgress <- reactiveVal(NULL)
   resampling_res <- reactiveVal(NULL)
   reshaped_data2 <- reactiveVal(NULL)
-  ranges <- reactiveValues(x = NULL, y = NULL)
-  ranges <- reactiveValues(x = NULL, y = NULL)
-  orig <- reactiveVal(NULL)
   rv <- reactiveValues(deletedColumns = character(0), deletedRows = character(0))
   app_activated <- reactiveVal(FALSE)
   
 
+  #display the genotype table entry if the app is active
   observe({
     if (!app_activated()) {
       app_activated(TRUE)
@@ -57,7 +48,7 @@ server <- function(input, output, session) {
   
 ############################ Function  #######################################
   
-  #funzione che reimposta tutti i valori nulli in una pagina
+  #resets values when loading a new project
   default_values_load_genotype <- function() {
     output$directoryInput <- renderUI(NULL)
     output$binarization_perc <- renderUI(NULL)
@@ -80,12 +71,39 @@ server <- function(input, output, session) {
     updateNumericInput(session, "seed", value = 12345)
     output$visualize_inference <- NULL
     output$graph_inference <- NULL
-    orig <- reactiveVal(NULL)
     rv <- reactiveValues(deletedColumns = character(0), deletedRows = character(0))
     app_activated(FALSE)
     reshaped_data2(NULL)
   }
   
+  #resets values when loading a genotype file
+  default_values_load_new_genotype <- function() {
+    output$directoryInput <- renderUI(NULL)
+    output$binarization_perc <- renderUI(NULL)
+    output$binarization <- renderUI(NULL)
+    updateSelectInput(session, "DeleteColumn", selected = character(0))
+    updateSelectInput(session, "DeleteRow", selected = character(0))
+    output$dataFile2 <- renderUI(NULL)
+    output$loadBtn2 <- renderUI(NULL)
+    output$dataTable <- NULL
+    output$dataTable2 <- NULL
+    output$heatmapPlot <- plotly::renderPlotly(NULL)
+    output$visualize_inference <- renderDataTable(NULL)
+    output$selected_result_output <- renderDataTable(NULL)
+    output$graph_inference <- renderDataTable(NULL)
+    updateCheckboxInput(session, "resamplingFlag", value = FALSE)
+    updateNumericInput(session, "nresampling", value = 3)
+    updateSelectInput(session, "regularization", selected = "aic")
+    updateSelectInput(session, "command", selected = "hc")
+    updateNumericInput(session, "restarts", value = 10)
+    updateNumericInput(session, "seed", value = 12345)
+    output$visualize_inference <- NULL
+    output$graph_inference <- NULL
+    rv <- reactiveValues(deletedColumns = character(0), deletedRows = character(0))
+    reshaped_data2(NULL)
+  }
+  
+  #resets values when creating a new project
   default_values_create_project <- function() {
     output$directoryInput <- renderUI(NULL)
     output$binarization_perc <- renderUI(NULL)
@@ -202,31 +220,35 @@ server <- function(input, output, session) {
   # selection/deletion of row and column
   modify_reshaped_data <- function(reshaped_data) {
     observe({
-      reshaped_data_df <- as.data.frame(reshaped_data) # Assicurati che sia un dataframe
+      reshaped_data_df <- as.data.frame(reshaped_data) 
       
       if (!is.null(input$DeleteColumn) && length(input$DeleteColumn) > 0) {
         if (all(input$DeleteColumn %in% colnames(reshaped_data_df))) {
-          reshaped_data_df <- reshaped_data_df[, !colnames(reshaped_data_df) %in% input$DeleteColumn, drop = FALSE]
+          reshaped_data_df <- reshaped_data_df[, !colnames(reshaped_data_df) 
+                                               %in% input$DeleteColumn, drop = FALSE]
         }
       }
       
       if (!is.null(input$DeleteRow) && length(input$DeleteRow) > 0) {
-        if (all(input$DeleteRow %in% rownames(reshaped_data_df)) || all(as.numeric(input$DeleteRow) %in% 1:nrow(reshaped_data_df))) {
-          reshaped_data_df <- reshaped_data_df[!rownames(reshaped_data_df) %in% input$DeleteRow, , drop = FALSE]
+        if (all(input$DeleteRow %in% rownames(reshaped_data_df)) || 
+            all(as.numeric(input$DeleteRow) %in% 1:nrow(reshaped_data_df))) {
+          reshaped_data_df <- reshaped_data_df[!rownames(reshaped_data_df) 
+                                               %in% input$DeleteRow, , drop = FALSE]
         }
       }
       
       reshaped_data_matrix <- as.matrix(reshaped_data_df)
       
       output$dataTable <- renderDT({
-        datatable(reshaped_data_matrix, options = list(scrollX = TRUE), selection = "single")
+        datatable(reshaped_data_matrix, options = list(scrollX = TRUE), 
+                  selection = "single")
       })
       
       output$heatmapPlot <- renderPlotly({
         generate_heatmap_plot(reshaped_data_matrix)
       })
       
-      # Rileva i clic sulle celle della tabella
+      # Detects clicks on table cells
       observe_table_cell_clicked(reshaped_data_matrix)
     })
     
@@ -368,15 +390,11 @@ server <- function(input, output, session) {
   readMatrixFiles <- function(directory_path) {
     
     readMatrix <- function(filePath) {
-      # Leggi i dati dal file
       matrix_data <- read.table(filePath, header = TRUE, 
                                 stringsAsFactors = FALSE,
                                 sep = "\t")
       
-      # Converti i dati in matrice di tipo double
       matrix_data <- as.matrix(matrix_data)
-      
-      # Imposta i nomi di righe e colonne uguali
       rownames(matrix_data) <- colnames(matrix_data)
       
       return(matrix_data)
@@ -386,36 +404,18 @@ server <- function(input, output, session) {
     
     matrix_list <- list()
     
-    # Itera su ogni file
     for (file in files) {
       matrix_name <- tools::file_path_sans_ext(basename(file))
       
-      # Leggi la matrice dal file e convertila in double
       matrix_data <- readMatrix(file)
       
-      # Aggiungi la matrice alla lista con il nome come nome di lista
       matrix_list[[matrix_name]] <- matrix_data
     }
     
     return(matrix_list)
   }
   
-  # Function for the interrupt key in the inference phase
-  interrupt <- function(calculationInProgress) {
-    if (is.null(calculationInProgress)) {
-      output$interruptButton <- renderUI({
-        actionButton("interruptBtn", 
-                     "Interrupt calcolo", 
-                     class = "custom-button")
-      })
-    }
-    else  {
-      output$interruptButton <- renderUI({})
-    }
-  }
   
-  
-  # Function for the interrupt key in the inference phase
   bulk_single_case <- function() {
     
     output$dataFile2 <- renderUI({
@@ -471,8 +471,8 @@ server <- function(input, output, session) {
     })
     
     output$directoryInput <- renderUI({
-      shinyDirButton("dir", "Seleziona una cartella", 
-                     title = "Seleziona una cartella", multiple = FALSE)
+      shinyDirButton("dir", "Select a folder", 
+                     title = "Select a folder", multiple = FALSE)
     })
     
     observe({
@@ -573,7 +573,7 @@ server <- function(input, output, session) {
   
   
   
-############################ Load or create project  #################################
+############################ Load or create project  ###########################
   
   ##Create
   
@@ -652,16 +652,16 @@ server <- function(input, output, session) {
               })
               reshaped_data2(data2)
             }
-            else if (file_name == "parametri_bulk_multiple") {
-              parametri <- read.csv(file_directory)
+            else if (file_name == "parameters_bulk_multiple") {
+              parameters <- read.csv(file_directory)
               
-              for (i in 1:nrow(parametri)) {
-                parametro <- parametri[i, "Nome"]
-                valore <- parametri[i, "Valore"]
+              for (i in 1:nrow(parameters)) {
+                parametro <- parameters[i, "name"]
+                value <- parameters[i, "value"]
                 
-                # Assegna il valore all'input corrispondente
+                # Assegna il value all'input corrispondente
                 if (parametro == "binarization_perc") {
-                  val_bin_perc <- as.numeric(valore)
+                  val_bin_perc <- as.numeric(value)
                   output$binarization_perc <- renderUI({
                     numericInput("binarization_perc", 
                                  "Filter to binarize percentage", 
@@ -703,25 +703,25 @@ server <- function(input, output, session) {
               }
               
             }
-            else if (file_name == "parametri") {
-              parametri <- read.csv(file_directory)
+            else if (file_name == "parameters") {
+              parameters <- read.csv(file_directory)
 
 
               # Ciclo attraverso ogni riga del dataframe
-              for (i in 1:nrow(parametri)) {
-                parametro <- parametri[i, "Nome"]
-                valore <- parametri[i, "Valore"]
+              for (i in 1:nrow(parameters)) {
+                parametro <- parameters[i, "name"]
+                value <- parameters[i, "value"]
 
-                # Assegna il valore all'input corrispondente
+                # Assegna il value all'input corrispondente
                 if (parametro == "binarization") {
-                  val_bin <- as.numeric(valore)
+                  val_bin <- as.numeric(value)
                   output$binarization <- renderUI({
                     numericInput("binarization", "Filter to binarize", 
                                  value = val_bin, min = 0, max = 1, step = 0.01)
                   })
                 }
                 else if (parametro =="del_col") {
-                  vettore <- unlist(strsplit(gsub("\"", "", valore), ",\\s*"))
+                  vettore <- unlist(strsplit(gsub("\"", "", value), ",\\s*"))
                   del_col <- vettore[vettore != ""]
                   output$DeleteColumn <- render_delete_column_ui("DeleteColumn", 
                                                                  "Delete column", 
@@ -729,7 +729,7 @@ server <- function(input, output, session) {
                                                                  selected_columns = del_col)
                   
                 }else if (parametro =="del_row") {
-                  vettore <- unlist(strsplit(gsub("\"", "", valore), ",\\s*"))
+                  vettore <- unlist(strsplit(gsub("\"", "", value), ",\\s*"))
                   del_row <- vettore[vettore != ""]
                   output$DeleteRow <- render_delete_row_ui("DeleteRow", 
                                                            "Delete row", 
@@ -737,21 +737,21 @@ server <- function(input, output, session) {
                                                            selected_rows = del_row)
                 }else if (parametro == "flag_resampling") {
                   updateCheckboxInput(session, "resamplingFlag", 
-                                      value = as.logical(valore))
+                                      value = as.logical(value))
                 } else if (parametro == "nresampling") {
                   updateNumericInput(session, "nresampling", 
-                                     value = as.numeric(valore))
+                                     value = as.numeric(value))
                 } else if (parametro == "restarts") {
                   updateNumericInput(session, "restarts", 
-                                     value = as.numeric(valore))
+                                     value = as.numeric(value))
                 } else if (parametro == "regularization") {
-                  elements <- unlist(strsplit(valore, ", "))
+                  elements <- unlist(strsplit(value, ", "))
                   updateSelectInput(session, "regularization", 
                                     selected = c(elements))
                 } else if (parametro == "command") {
-                  updateSelectInput(session, "command", selected = valore)
+                  updateSelectInput(session, "command", selected = value)
                 } else if (parametro == "seed") {
-                  val_seed <- as.numeric(valore)
+                  val_seed <- as.numeric(value)
                   updateNumericInput(session, "seed", value = val_seed)
                 }
               }
@@ -784,7 +784,8 @@ server <- function(input, output, session) {
   # Function to render UI for deleting columns
   render_delete_column_ui <- function(input_id, label, data, selected_columns = NULL) {
     output <- renderUI({
-      selectInput(input_id, label, choices = colnames(data), selected = selected_columns, multiple = TRUE)
+      selectInput(input_id, label, choices = colnames(data), 
+                  selected = selected_columns, multiple = TRUE)
     })
     return(output)
   }
@@ -794,12 +795,13 @@ server <- function(input, output, session) {
   # Function to render UI for deleting rows
   render_delete_row_ui <- function(input_id, label, data, selected_rows = NULL) {
       output <- renderUI({
-        selectInput(input_id, label, choices = rownames(data), selected = selected_rows, multiple = TRUE)
+        selectInput(input_id, label, choices = rownames(data), 
+                    selected = selected_rows, multiple = TRUE)
       })
       return(output)
   }
   
-############################ Input data  ##################################################
+############################ Input data  #######################################
   
   
   # Displaying the resampling file, in the case where there are three columns 
@@ -825,15 +827,14 @@ server <- function(input, output, session) {
     inFile <- input$dataFile
     
     if (is.null(inFile)) {
-      showNotification("File non caricato.", type = "error")
+      showNotification("File not loaded.", type = "error")
     } else {
       data <- read.table(inFile$datapath, sep = "\t", header = TRUE, 
                          stringsAsFactors = FALSE)
       
-      orig(data)
       #### Bulk single biopsy
       if (ncol(data) == 3) {
-        default_values_load_genotype()
+        default_values_load_new_genotype()
         case("bulk_single")
         
         data <- distinct(data, SAMPLE, GENE, .keep_all = TRUE)
@@ -853,7 +854,7 @@ server <- function(input, output, session) {
         
       } else if (ncol(data) == 4) {   #### Bulk multipla biopsia o single cell 
         if (colnames(data)[2]=="REGION") {
-          default_values_load_genotype()
+          default_values_load_new_genotype()
 
           case("bulk_multiple")
           # Remove duplicates by keeping only the first occurrence for each position
@@ -927,7 +928,7 @@ server <- function(input, output, session) {
           
           
         } else if (colnames(data)[2]=="CELL") {
-          default_values_load_genotype()
+          default_values_load_new_genotype()
           case("single_cell")
           # Remove duplicates by keeping only the first occurrence for each position
           data <- distinct(data, PATIENT, CELL, GENE, .keep_all = TRUE)
@@ -1004,7 +1005,7 @@ server <- function(input, output, session) {
   })
 
   
-############################ Inference  ####################################################
+############################ Inference  ########################################
   
   # filter the genotype table according to the case
   observeEvent(input$submitBtn, {
@@ -1045,7 +1046,9 @@ server <- function(input, output, session) {
     # Check whether the resampling flag has been activated.
     if (input$resamplingFlag) {
       # Check if case is not null and if it's bulk_single, whether the file is loaded
-      if (!is.null(case()) && (case() != "bulk_single" || !is.null(input$dataTable2) || !is.null(reshaped_data2()))) {
+      if (!is.null(case()) && (case() != "bulk_single" || 
+                               !is.null(input$dataTable2) || 
+                               !is.null(reshaped_data2()))) {
         output$nresampling <- renderUI({
           numericInput("nresampling", "Number of samplings", 3, min = 3)
         })
@@ -1060,19 +1063,9 @@ server <- function(input, output, session) {
       output$nresampling <- NULL
     }
   })
-  
 
-
-  
-  
-  
-  
-  observeEvent(input$interruptButton, {
-    progress$interrupt()
-  })
   
   res <- NULL
-  
   #inference function
   observeEvent(input$submitBtn, {
     tryCatch({
@@ -1087,8 +1080,7 @@ server <- function(input, output, session) {
       else if(case()=="bulk_single") {
         if (input$resamplingFlag == FALSE) {
           
-          interrupt(calculationInProgress())
-          
+
           progress <- withProgress(
             message = 'Ongoing calculation...',
             detail = 'This may take some time...',
@@ -1103,12 +1095,8 @@ server <- function(input, output, session) {
             }
           )
           
-          calculationInProgress(progress)
-          
-          interrupt(calculationInProgress())
         }
         else {
-          interrupt(calculationInProgress())
           
           progress <- withProgress(
             message = 'Ongoing calculation...',
@@ -1126,9 +1114,7 @@ server <- function(input, output, session) {
             }
           )
           
-          calculationInProgress(progress)
-          
-          interrupt(calculationInProgress())
+
         }
       }
       else if(case()=="bulk_multiple" || case() == "single_cell") {
@@ -1139,7 +1125,6 @@ server <- function(input, output, session) {
         }
         else if (input$resamplingFlag == FALSE) {
           models <- readMatrixFiles(selected_folder())
-          interrupt(calculationInProgress())
           
           progress <- withProgress(
             message = 'Ongoing calculation...',
@@ -1154,16 +1139,12 @@ server <- function(input, output, session) {
               )
             }
           )
-          
-          calculationInProgress(progress)
-          
-          interrupt(calculationInProgress())
+
           
         }
         else {
           models <- readMatrixFiles(selected_folder())
-          interrupt(calculationInProgress())
-          
+
           progress <- withProgress(
             message = 'Ongoing calculation...',
             detail = 'This may take some time...',
@@ -1178,10 +1159,7 @@ server <- function(input, output, session) {
               )
             }
           )
-          
-          calculationInProgress(progress)
-          
-          interrupt(calculationInProgress())
+
         }
       }
   
@@ -1209,8 +1187,9 @@ server <- function(input, output, session) {
       })
   })
   
+  # display the inference output
   observe({
-    req(input$visualize_inference)  # Assicurati che l'input sia presente
+    req(input$visualize_inference)
     
     res <- resampling_res()
     output$selected_result_output <- NULL
@@ -1267,10 +1246,10 @@ server <- function(input, output, session) {
 
 
 
-############################ FASE SALVATAGGIO  ############################################## 
+############################ Save project  ################################# 
 
-  saveData <- function(data, nome) {
-    write.csv(data, nome, row.names=TRUE)
+  saveData <- function(data, name) {
+    write.csv(data, name, row.names=TRUE)
   }
   
   
@@ -1283,104 +1262,96 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$saveBtn, {
-    nome_progetto <- input$project_name
-    nome_progetto <- paste0(nome_progetto, "_", case())
+    project_name <- input$project_name
+    project_name <- paste0(project_name, "_", case())
     directory_output <- "output_project/"
-    directory_completo <- paste0(directory_output, nome_progetto)
+    directory_complete <- paste0(directory_output, project_name)
 
     if(!(is.null(case()))) {
-      
-      # Verifica se la directory esiste, altrimenti creala
-      if (!file.exists(directory_completo)) {
-        dir.create(directory_completo, recursive = TRUE)
+      if (!file.exists(directory_complete)) {
+        dir.create(directory_complete, recursive = TRUE)
       }
-
-      directory_file <- paste0(directory_completo, "/genotipo.csv")
+      directory_file <- paste0(directory_complete, "/genotipo.csv")
       saveData(reshaped_data() , directory_file)
-      
-
-
-      valori <- c("binarization", "del_col", "del_row", "flag_resampling", 
+      values <- c("binarization", "del_col", "del_row", "flag_resampling", 
                   "nresampling", "restarts", "regularization", "command", 
                   "seed", "output_inference")
       
 
-      sequenza <- ifelse((!is.null(input$binarization)), input$binarization, NA)
-      sequenza <- c(sequenza, ifelse((!is.null(input$DeleteColumn)), 
+      sequence <- ifelse((!is.null(input$binarization)), input$binarization, NA)
+      sequence <- c(sequence, ifelse((!is.null(input$DeleteColumn)), 
                                      toString(input$DeleteColumn), NA))
-      sequenza <- c(sequenza, ifelse((!is.null(input$DeleteRow)), 
+      sequence <- c(sequence, ifelse((!is.null(input$DeleteRow)), 
                                      toString(input$DeleteRow), NA))
-      sequenza <- c(sequenza, ifelse((!is.null(input$resamplingFlag)), 
+      sequence <- c(sequence, ifelse((!is.null(input$resamplingFlag)), 
                                      input$resamplingFlag, NA))
-      sequenza <- c(sequenza, ifelse((!is.null(input$nresampling)), 
+      sequence <- c(sequence, ifelse((!is.null(input$nresampling)), 
                                      input$nresampling, NA))
-      sequenza <- c(sequenza, ifelse((!is.null(input$restarts)), 
+      sequence <- c(sequence, ifelse((!is.null(input$restarts)), 
                                      input$restarts, NA))
-      sequenza <- c(sequenza, ifelse((!is.null(input$regularization)), 
+      sequence <- c(sequence, ifelse((!is.null(input$regularization)), 
                                      toString(input$regularization), NA))
-      sequenza <- c(sequenza, ifelse((!is.null(input$command)), 
+      sequence <- c(sequence, ifelse((!is.null(input$command)), 
                                      input$command, NA))
-      sequenza <- c(sequenza, ifelse((!is.null(input$seed)), input$seed, NA))
+      sequence <- c(sequence, ifelse((!is.null(input$seed)), input$seed, NA))
 
       
-      matrice_dati <- matrix(data = c(valori, sequenza),
-                             nrow = length(valori),
+      matrix_data <- matrix(data = c(values, sequence),
+                             nrow = length(values),
                              ncol = 2,
                              byrow = FALSE)
       
-      matrice_dataframe <- as.data.frame(matrice_dati)
-      colnames(matrice_dataframe) <- c("Nome", "Valore")
+      matrix_dataframe <- as.data.frame(matrix_data)
+      colnames(matrix_dataframe) <- c("name", "value")
 
-      directory_file <- paste0(directory_completo, "/parametri.csv")
-      saveData(matrice_dataframe , directory_file)
+      directory_file <- paste0(directory_complete, "/parameters.csv")
+      saveData(matrix_dataframe , directory_file)
       
       if(!is.null(resampling_res())) {
-        directory_file <- paste0(directory_completo, "/resampling_res.rds")
+        directory_file <- paste0(directory_complete, "/resampling_res.rds")
         saveRDS(resampling_res(), directory_file)
       }
       
       
       if (case()=="bulk_single") {
-        directory_file <- paste0(directory_completo, "/resampling_table.csv")
+        directory_file <- paste0(directory_complete, "/resampling_table.csv")
         if (!(is.null(reshaped_data2()))) {
           saveData(reshaped_data2() , directory_file)
         }
       } else if (case()=="bulk_multiple") {
         
         
-        valori <- c("directory", "binarization_perc")
-        # Costruisci la sequenza di valori
-        sequenza <- ifelse(!is.null(input$dir), toString(input$dir), NA)
-        sequenza <- c(sequenza, ifelse(!is.null(input$binarization_perc), 
+        values <- c("directory", "binarization_perc")
+        sequence <- ifelse(!is.null(input$dir), toString(input$dir), NA)
+        sequence <- c(sequence, ifelse(!is.null(input$binarization_perc), 
                                        input$binarization_perc, NA))
         
-        matrice_dati <- matrix(data = c(valori, sequenza),
-                               nrow = length(valori),
+        matrix_data <- matrix(data = c(values, sequence),
+                               nrow = length(values),
                                ncol = 2,
                                byrow = FALSE)
         
-        matrice_dataframe <- as.data.frame(matrice_dati)
-        colnames(matrice_dataframe) <- c("Nome", "Valore")
+        matrix_dataframe <- as.data.frame(matrix_data)
+        colnames(matrix_dataframe) <- c("name", "value")
         
-        # Scrivi il dataframe nel file CSV
-        directory_file <- paste0(directory_completo, "/parametri_bulk_multiple.csv")
-        saveData(matrice_dataframe , directory_file)
+        directory_file <- paste0(directory_complete, "/parameters_bulk_multiple.csv")
+        saveData(matrix_dataframe , directory_file)
         
       } else if (case()=="single_cell") {
-        valori <- c("directory")
+        values <- c("directory")
         
-        sequenza <- ifelse(!is.null(input$dir), toString(input$dir), NA)
+        sequence <- ifelse(!is.null(input$dir), toString(input$dir), NA)
         
-        matrice_dati <- matrix(data = c(valori, sequenza),
-                               nrow = length(valori),
+        matrix_data <- matrix(data = c(values, sequence),
+                               nrow = length(values),
                                ncol = 2,
                                byrow = FALSE)
-        matrice_dataframe <- as.data.frame(matrice_dati)
-        colnames(matrice_dataframe) <- c("Nome", "Valore")
+        matrix_dataframe <- as.data.frame(matrix_data)
+        colnames(matrix_dataframe) <- c("name", "value")
         
         
-        directory_file <- paste0(directory_completo, "/parametri_single_cell.csv")
-        saveData(matrice_dataframe , directory_file)
+        directory_file <- paste0(directory_complete, "/parameters_single_cell.csv")
+        saveData(matrix_dataframe , directory_file)
       }
       
       showNotification("Project saved", type = "message")

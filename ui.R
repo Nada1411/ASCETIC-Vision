@@ -172,7 +172,6 @@ shinyUI(
               style = "display: flex; justify-content: center;",
               visNetworkOutput("graph_inference", width = "50%", height = "400px")
             ),
-            uiOutput("interruptButton"),
             style = "margin-top: 30px;",
             div(
               style = "display: flex; justify-content: center; margin-top: -350px;",
