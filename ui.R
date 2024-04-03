@@ -54,7 +54,8 @@ shinyUI(
             fluidRow(
               column(6,
                      uiOutput("dataFile"),
-                     actionButton("loadBtn", "Load", class = "custom-button", style = "margin-bottom: 25px;")
+                     actionButton("loadBtn", "Load", class = "custom-button", 
+                                  style = "margin-bottom: 25px;")
               ),
               column(6,
                      uiOutput("dataFile2"),
@@ -89,7 +90,8 @@ shinyUI(
             ),
             conditionalPanel(
               condition = "output.dataTable",
-              tags$div("Genotype", style = "font-weight: bold; margin-top: 30px; margin-left: 0px; font-size: 17px; margin-bottom: 20px;"),  
+              tags$div("Genotype", style = "font-weight: bold; margin-top: 30px; 
+                       margin-left: 0px; font-size: 17px; margin-bottom: 20px;"),  
             ),
             fluidRow(
               column(12,
@@ -113,7 +115,9 @@ shinyUI(
             ),
             conditionalPanel(
               condition = "output.dataTable2",
-              tags$div("Resampling", style = "font-weight: bold; margin-top: 30px; margin-left: 0px; font-size: 17px; margin-bottom: 20px;"),  # Imposta il testo "Resampling" con stili CSS
+              tags$div("Resampling", style = "font-weight: bold; 
+                       margin-top: 30px; margin-left: 0px; font-size: 17px; 
+                       margin-bottom: 20px;"),  
             ),
             DTOutput("dataTable2"),
             conditionalPanel(
@@ -160,7 +164,9 @@ shinyUI(
             uiOutput("visualize_inference"),
             conditionalPanel(
               condition = "output.graph_inference",
-              tags$div("Inference output", style = "font-weight: bold; margin-top: 30px; font-size: 17px; margin-bottom: 20px; text-align: center;"),
+              tags$div("Inference output", style = "font-weight: bold; 
+                       margin-top: 30px; font-size: 17px; margin-bottom: 20px; 
+                       text-align: center;"),
             ),
             div(
               style = "display: flex; justify-content: center;",
