@@ -31,7 +31,7 @@ server <- function(input, output, session) {
   reshaped_data2 <- reactiveVal(NULL)
   rv <- reactiveValues(deletedColumns = character(0), deletedRows = character(0))
   app_activated <- reactiveVal(FALSE)
-  
+  nresampling <- reactiveVal(FALSE)
 
   #display the genotype table entry if the app is active
   observe({
@@ -74,6 +74,7 @@ server <- function(input, output, session) {
     rv <- reactiveValues(deletedColumns = character(0), deletedRows = character(0))
     app_activated(FALSE)
     reshaped_data2(NULL)
+    nresampling(NULL)
   }
   
   #resets values when loading a genotype file
@@ -101,6 +102,8 @@ server <- function(input, output, session) {
     output$graph_inference <- NULL
     rv <- reactiveValues(deletedColumns = character(0), deletedRows = character(0))
     reshaped_data2(NULL)
+    nresampling(NULL)
+    
   }
   
   #resets values when creating a new project
@@ -131,6 +134,7 @@ server <- function(input, output, session) {
     output$content <- NULL
     app_activated(FALSE)
     reshaped_data2(NULL)
+    nresampling(NULL)
   }
   
   
@@ -299,93 +303,99 @@ server <- function(input, output, session) {
       if (!is.null(info) && !is.null(info$row) && !is.null(info$col)) {
         row_index <- info$row
         selected_id <- strsplit((rownames(reshaped_data)[row_index]), " ")[[1]][1]
-
+        
         req(input$dir)
         selected_folder <- parseDirPath(c(wd = getwd()), input$dir)
         selected_id <- sub("\\s.*", "", selected_id)
         file_to_search <- paste0(selected_id, ".txt")
         file_path <- file.path(selected_folder, file_to_search)
-        file_data <- read.table(file_path, header = TRUE, 
-                                stringsAsFactors = FALSE, sep = "\t")
-
         
-        col_names <- colnames(file_data)
-
-        
-        file_data[[id_column_name]] <- col_names
-        
-        file_data <- file_data[, c(id_column_name, setdiff(col_names, 
-                                                           id_column_name))]
-        if (length(input$DeleteColumn) > 0){
-          for (col in input$DeleteColumn) {
-            if(col %in% colnames(file_data)) {
-            col_index <- which(colnames(file_data) == col)
-            # nodo foglia
-              if ((1 %in% file_data[[col_index]]) && 
-                  (all(as.numeric(file_data[col_index-1, -1]) == 0))) {
-                file_data[[col_index]][file_data[[col_index]] == 1] <- 0
-              }
-              
-              #nodo radice
-              if (!(1 %in% file_data[[col_index]]) && 
-                  (any(as.numeric(file_data[col_index-1, -1]) == 1))) {
-                file_data[col_index - 1, -1][file_data[col_index - 1, -1] == 1] <- 0
-              }
-              
-              #nodo interno
-              if ((1 %in% file_data[[col_index]]) && 
-                  (any(as.numeric(file_data[col_index-1, -1]) == 1))){
-                indici_riga <- which(file_data[col_index-1, -1] == 1)
-                
-                indici_colonna <- which(file_data[[col_index]] == 1)
-                
-                for (colonna in indici_colonna) {
-                  for (riga in indici_riga) {
-                    file_data[colonna, riga+1] <- 1
-                  }
+        # Verifica se il file esiste
+        if (file.exists(file_path)) {
+          file_data <- read.table(file_path, header = TRUE, 
+                                  stringsAsFactors = FALSE, sep = "\t")
+          
+          col_names <- colnames(file_data)
+          
+          file_data[[id_column_name]] <- col_names
+          
+          file_data <- file_data[, c(id_column_name, setdiff(col_names, 
+                                                             id_column_name))]
+          if (length(input$DeleteColumn) > 0){
+            for (col in input$DeleteColumn) {
+              if(col %in% colnames(file_data)) {
+                col_index <- which(colnames(file_data) == col)
+                # nodo foglia
+                if ((1 %in% file_data[[col_index]]) && 
+                    (all(as.numeric(file_data[col_index-1, -1]) == 0))) {
+                  file_data[[col_index]][file_data[[col_index]] == 1] <- 0
                 }
-                file_data[[col_index]][file_data[[col_index]] == 1] <- 0
-                file_data[col_index - 1, -1][file_data[col_index - 1, -1] == 1] <- 0
+                
+                #nodo radice
+                if (!(1 %in% file_data[[col_index]]) && 
+                    (any(as.numeric(file_data[col_index-1, -1]) == 1))) {
+                  file_data[col_index - 1, -1][file_data[col_index - 1, -1] == 1] <- 0
+                }
+                
+                #nodo interno
+                if ((1 %in% file_data[[col_index]]) && 
+                    (any(as.numeric(file_data[col_index-1, -1]) == 1))){
+                  indici_riga <- which(file_data[col_index-1, -1] == 1)
+                  
+                  indici_colonna <- which(file_data[[col_index]] == 1)
+                  
+                  for (colonna in indici_colonna) {
+                    for (riga in indici_riga) {
+                      file_data[colonna, riga+1] <- 1
+                    }
+                  }
+                  file_data[[col_index]][file_data[[col_index]] == 1] <- 0
+                  file_data[col_index - 1, -1][file_data[col_index - 1, -1] == 1] <- 0
+                }
               }
             }
           }
-}
-
-        output$content <- renderUI({
-          tagList(
-            tags$hr(),
-            div(
-              style = "display: flex; justify-content: center; margin-top: 50px;",
-              visNetworkOutput("graphPlot", width = "50%", height = "400px")
+          
+          output$content <- renderUI({
+            tagList(
+              tags$hr(),
+              div(
+                style = "display: flex; justify-content: center; margin-top: 50px;",
+                visNetworkOutput("graphPlot", width = "50%", height = "400px")
+              )
             )
-          )
-        })
-        
-        output$fileDataTable <- renderDT({
-          datatable(file_data, options = list(scrollX = TRUE), selection ="single")
-        })
-        
-        graph_data <- reshape2::melt(file_data, id.vars = id_column_name)
-        edges <- graph_data[graph_data$value != 0, c(id_column_name, "variable")]
-        
-        graph <- graph_from_data_frame(edges, directed = TRUE)
-        
-        
-        output$graphPlot <- renderVisNetwork({
+          })
           
-          nodes <- as_tibble(get.vertex.attribute(graph))
-          colnames(nodes) <- "id"
-          nodes <- data.frame(nodes, label= nodes$id)
-          edges <- as_tibble(as_edgelist(graph))
-          colnames(edges) <- c("from", "to")
+          output$fileDataTable <- renderDT({
+            datatable(file_data, options = list(scrollX = TRUE), selection ="single")
+          })
+          
+          graph_data <- reshape2::melt(file_data, id.vars = id_column_name)
+          edges <- graph_data[graph_data$value != 0, c(id_column_name, "variable")]
+          
+          graph <- graph_from_data_frame(edges, directed = TRUE)
           
           
-          generateVisNetwork(nodes, edges, "other", "DAG")
-        })
-        
+          output$graphPlot <- renderVisNetwork({
+            
+            nodes <- as_tibble(get.vertex.attribute(graph))
+            colnames(nodes) <- "id"
+            nodes <- data.frame(nodes, label= nodes$id)
+            edges <- as_tibble(as_edgelist(graph))
+            colnames(edges) <- c("from", "to")
+            
+            
+            generateVisNetwork(nodes, edges, "other", "DAG")
+          })
+          
+        } else {
+          # Se il file non viene trovato, emetti un avvertimento
+          showNotification("Seleziona la cartella corretta", type = "warning")
         }
+      }
     })
   }
+  
   
   readMatrixFiles <- function(directory_path) {
     
@@ -739,6 +749,7 @@ server <- function(input, output, session) {
                   updateCheckboxInput(session, "resamplingFlag", 
                                       value = as.logical(value))
                 } else if (parametro == "nresampling") {
+                  nresampling(as.numeric(value))
                   updateNumericInput(session, "nresampling", 
                                      value = as.numeric(value))
                 } else if (parametro == "restarts") {
@@ -1049,9 +1060,15 @@ server <- function(input, output, session) {
       if (!is.null(case()) && (case() != "bulk_single" || 
                                !is.null(input$dataTable2) || 
                                !is.null(reshaped_data2()))) {
-        output$nresampling <- renderUI({
-          numericInput("nresampling", "Number of samplings", 3, min = 3)
-        })
+        if (!is.null(nresampling())) {
+          output$nresampling <- renderUI({
+            numericInput("nresampling", "Number of samplings", nresampling(), min = 3)
+          })
+        } else {
+          output$nresampling <- renderUI({
+            numericInput("nresampling", "Number of samplings", 3, min = 3)
+          })
+        }
       } else {
         # If the condition is not met, show a warning
         showNotification("Load the resampling file in the previous step", type = "warning")
