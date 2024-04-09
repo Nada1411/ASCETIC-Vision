@@ -60,9 +60,7 @@ server <- function(input, output, session) {
     output$dataTable <- NULL
     output$dataTable2 <- NULL
     output$heatmapPlot <- plotly::renderPlotly(NULL)
-    output$visualize_inference <- renderDataTable(NULL)
     output$selected_result_output <- renderDataTable(NULL)
-    output$graph_inference <- renderDataTable(NULL)
     updateCheckboxInput(session, "resamplingFlag", value = FALSE)
     updateNumericInput(session, "nresampling", value = 3)
     updateSelectInput(session, "regularization", selected = "aic")
@@ -75,6 +73,8 @@ server <- function(input, output, session) {
     app_activated(FALSE)
     reshaped_data2(NULL)
     nresampling(NULL)
+    output$content <- NULL
+    
   }
   
   #resets values when loading a genotype file
@@ -89,9 +89,6 @@ server <- function(input, output, session) {
     output$dataTable <- NULL
     output$dataTable2 <- NULL
     output$heatmapPlot <- plotly::renderPlotly(NULL)
-    output$visualize_inference <- renderDataTable(NULL)
-    output$selected_result_output <- renderDataTable(NULL)
-    output$graph_inference <- renderDataTable(NULL)
     updateCheckboxInput(session, "resamplingFlag", value = FALSE)
     updateNumericInput(session, "nresampling", value = 3)
     updateSelectInput(session, "regularization", selected = "aic")
@@ -100,9 +97,11 @@ server <- function(input, output, session) {
     updateNumericInput(session, "seed", value = 12345)
     output$visualize_inference <- NULL
     output$graph_inference <- NULL
+    output$selected_result_output <- NULL
     rv <- reactiveValues(deletedColumns = character(0), deletedRows = character(0))
     reshaped_data2(NULL)
     nresampling(NULL)
+    output$content <- NULL
     
   }
   
@@ -117,8 +116,6 @@ server <- function(input, output, session) {
     output$dataTable2 <- NULL
     output$heatmapPlot <- plotly::renderPlotly({NULL})
     output$switchViewBtn <- renderUI(NULL)
-    output$selected_result_output <- renderDataTable(NULL)
-    output$graph_inference <- renderDataTable(NULL)
     updateCheckboxInput(session, "resamplingFlag", value = FALSE)
     updateNumericInput(session, "nresampling", value = 3)
     updateSelectInput(session, "regularization", selected = "aic")
@@ -127,6 +124,7 @@ server <- function(input, output, session) {
     updateNumericInput(session, "seed", value = 12345)
     output$visualize_inference <- NULL
     output$graph_inference <- NULL
+    output$selected_result_output <- NULL
     orig <- reactiveVal(NULL)
     rv <- reactiveValues(deletedColumns = character(0), deletedRows = character(0))
     output$DeleteColumn <- NULL
@@ -543,41 +541,51 @@ server <- function(input, output, session) {
                                 text-align:center;")
     
     if (layout_type == "poset") {
-      visNetwork(nodes, edges, main = main_options) %>%
+      visNetwork(nodes, edges, main = main_options, background = "white") %>%
         visHierarchicalLayout(direction = "LR") %>%
         visNodes(
           shape = "dot",
+          size = 5,
           color = list(
             background = "#23B3E8",
             border = "#013848",
             highlight = "#E112EB"
           ),
           shadow = list(enabled = TRUE, size = 10),
-          font = list(size = 20, vadjust = -50)
+          font = list(size = 10, vadjust = -50)
         ) %>%
         visEdges(
           shadow = FALSE,
           color = list(color = "#0085AF", highlight = "#E112EB"),
           arrows = "to"
-        )
+        )%>% 
+        visOptions(nodesIdSelection = TRUE)%>% 
+        visInteraction(navigationButtons = TRUE)
     } else {
-      visNetwork(nodes, edges, main = main_options) %>%
+      
+      
+      visNetwork(nodes, edges, main = main_options, background = "white") %>%
         visIgraphLayout(layout = "layout_with_sugiyama") %>%
         visNodes(
           shape = "dot",
+          size = 5,  
           color = list(
             background = "#23B3E8",
             border = "#013848",
-            highlight = "#E112EB"
+            highlight = "#B20062"
           ),
           shadow = list(enabled = TRUE, size = 10),
-          font = list(size = 20, vadjust = -50)
+          font = list(size = 10, vadjust = -30)
         ) %>%
         visEdges(
           shadow = FALSE,
-          color = list(color = "#0085AF", highlight = "#E112EB"),
-          arrows = "to"
-        )
+          color = list(color = "#0085AF", highlight = "#B20062"),
+          arrows = list(to = list(enabled = TRUE, scaleFactor = 0.5)),
+          width = 2,
+          length = 2
+        )%>% 
+        visOptions(nodesIdSelection = TRUE)%>% 
+        visInteraction(navigationButtons = TRUE)
     }
   }
   
@@ -1206,8 +1214,10 @@ server <- function(input, output, session) {
   
   # display the inference output
   observe({
+    req(input$sidebarMenu == "inference")
     req(input$visualize_inference)
-    
+
+
     res <- resampling_res()
     output$selected_result_output <- NULL
     col_names <- colnames(res$dataset)

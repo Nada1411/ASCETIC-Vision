@@ -60,7 +60,9 @@ shinyUI(
               column(6,
                      uiOutput("dataFile2"),
                      uiOutput("loadBtn2"),
-                     uiOutput("directoryInput")
+                     fluidRow(
+                       column(width = 12, style = "margin-top: -7px;", uiOutput("directoryInput"))
+                     )
               )
             ),
             fluidRow(
@@ -170,13 +172,14 @@ shinyUI(
             ),
             div(
               style = "display: flex; justify-content: center;",
-              visNetworkOutput("graph_inference", width = "50%", height = "400px")
+              visNetworkOutput("graph_inference", width = "80%", height = "500px")
             ),
             style = "margin-top: 30px;",
             div(
               style = "display: flex; justify-content: center; margin-top: -350px;",
               DTOutput("selected_result_output")
             ),
+            style = "margin-bottom: 500px;",
           )
         ),
         tabItem(
