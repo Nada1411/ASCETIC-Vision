@@ -176,7 +176,7 @@ shinyUI(
             ),
             style = "margin-top: 30px;",
             div(
-              style = "display: flex; justify-content: center; margin-top: -350px;",
+              style = "display: flex; justify-content: center; margin-top: -480px;",
               DTOutput("selected_result_output")
             ),
             style = "margin-bottom: 500px;",

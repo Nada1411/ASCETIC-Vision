@@ -32,7 +32,8 @@ server <- function(input, output, session) {
   rv <- reactiveValues(deletedColumns = character(0), deletedRows = character(0))
   app_activated <- reactiveVal(FALSE)
   nresampling <- reactiveVal(FALSE)
-
+  visualizeInferenceOutput <- reactiveVal(TRUE)
+  
   #display the genotype table entry if the app is active
   observe({
     if (!app_activated()) {
@@ -74,8 +75,8 @@ server <- function(input, output, session) {
     reshaped_data2(NULL)
     nresampling(NULL)
     output$content <- NULL
-    
-  }
+    visualizeInferenceOutput(FALSE)
+    }
   
   #resets values when loading a genotype file
   default_values_load_new_genotype <- function() {
@@ -102,6 +103,7 @@ server <- function(input, output, session) {
     reshaped_data2(NULL)
     nresampling(NULL)
     output$content <- NULL
+    visualizeInferenceOutput(FALSE)
     
   }
   
@@ -122,7 +124,6 @@ server <- function(input, output, session) {
     updateSelectInput(session, "command", selected = "hc")
     updateNumericInput(session, "restarts", value = 10)
     updateNumericInput(session, "seed", value = 12345)
-    output$visualize_inference <- NULL
     output$graph_inference <- NULL
     output$selected_result_output <- NULL
     orig <- reactiveVal(NULL)
@@ -133,6 +134,8 @@ server <- function(input, output, session) {
     app_activated(FALSE)
     reshaped_data2(NULL)
     nresampling(NULL)
+    visualizeInferenceOutput(FALSE)
+    output$visualize_inference <- NULL
   }
   
   
@@ -782,6 +785,7 @@ server <- function(input, output, session) {
               names_to_remove <- c("dataset", "models", "ccfDataset", "inference")
               names <- setdiff(names(res), names_to_remove)
               names <- c(names, names(res$inference))
+              visualizeInferenceOutput(TRUE)
               output$visualize_inference <- renderUI({
                 selectInput("visualize_inference", 
                             "Output inference", 
@@ -1197,7 +1201,7 @@ server <- function(input, output, session) {
         names <- setdiff(names(res), names_to_remove)
         names <- c(names, names(res$inference))
         
-        
+        visualizeInferenceOutput(TRUE)
         output$visualize_inference <- renderUI({selectInput("visualize_inference", 
                                                             "Output inference", 
                                                             c(names),
@@ -1205,6 +1209,7 @@ server <- function(input, output, session) {
     
       }
       }, error = function(e) {
+        visualizeInferenceOutput(FALSE)
         output$visualize_inference <- NULL
         output$selected_result_output <- NULL
         output$graph_inference <- NULL
@@ -1222,49 +1227,59 @@ server <- function(input, output, session) {
     output$selected_result_output <- NULL
     col_names <- colnames(res$dataset)
     
-    if (input$visualize_inference %in% names(res)) {
-      selected_result <- res[[input$visualize_inference]]
-    } else {
-      selected_result <- res$inference[[input$visualize_inference]]
-    }
-    
-    if (input$visualize_inference == "rankingEstimate") {
-      output$graph_inference <- NULL
-      
-      output$selected_result_output <- renderDT({
-        selected_result[, "variable"] <- row.names(selected_result)
-        selected_result[, "rank"] <- (as.integer(selected_result[, "rank"]) + 1) 
-        colnames(selected_result)[1] <- "genes"
-        datatable(selected_result, options = list(scrollX = TRUE), 
-                  rownames = FALSE, selection ="single")
-      })
-    } else {
-      colnames(selected_result) <- col_names
-      rownames(selected_result) <- col_names
-      if (all(selected_result == 0)) {
-        showNotification("No DAG available", type = "message")
-        output$graph_inference <- NULL
+    if(visualizeInferenceOutput()) {
+      if (input$visualize_inference %in% names(res)) {
+        print("1")
+        selected_result <- res[[input$visualize_inference]]
       } else {
-        grafo <- graph_from_adjacency_matrix(selected_result)
-        
-        output$graph_inference <- renderVisNetwork({
-          nodi_da_rimuovere <- V(grafo)[degree(grafo, mode = "in") == 0 & 
-                                          degree(grafo, mode = "out") == 0]
-          grafo <- delete.vertices(grafo, nodi_da_rimuovere)
-          
-          nodes <- as_tibble(get.vertex.attribute(grafo))
-          colnames(nodes) <- "id"
-          nodes <- data.frame(nodes, label= nodes$id)
-          edges <- as_tibble(as_edgelist(grafo))
-          colnames(edges) <- c("from", "to")
-          
-          if (input$visualize_inference == 'poset') {
-            generateVisNetwork(nodes, edges, "other", "")
-          } else {
-            generateVisNetwork(nodes, edges, "other", "")
-          }
-        })
+        print("2")
+        selected_result <- res$inference[[input$visualize_inference]]
       }
+      
+      if (input$visualize_inference == "rankingEstimate") {
+        output$graph_inference <- NULL
+        output$selected_result_output <- renderDT({
+          selected_result[, "variable"] <- row.names(selected_result)
+          selected_result[, "rank"] <- (as.integer(selected_result[, "rank"]) + 1) 
+          colnames(selected_result)[1] <- "genes"
+          datatable(selected_result, options = list(scrollX = TRUE), 
+                    rownames = FALSE, selection ="single")
+        })
+      } else if (input$visualize_inference == "poset"){
+        print("qui")
+        output$graph_inference <- NULL
+        output$selected_result_output <- renderDT({
+          datatable(selected_result, options = list(scrollX = TRUE), rownames = FALSE, selection ="single")
+        })
+  
+        } else {
+        colnames(selected_result) <- col_names
+        rownames(selected_result) <- col_names
+        if (all(selected_result == 0)) {
+          showNotification("No DAG available", type = "message")
+          output$graph_inference <- NULL
+        } else {
+          grafo <- graph_from_adjacency_matrix(selected_result)
+          
+          output$graph_inference <- renderVisNetwork({
+            nodi_da_rimuovere <- V(grafo)[degree(grafo, mode = "in") == 0 & 
+                                            degree(grafo, mode = "out") == 0]
+            grafo <- delete.vertices(grafo, nodi_da_rimuovere)
+            
+            nodes <- as_tibble(get.vertex.attribute(grafo))
+            colnames(nodes) <- "id"
+            nodes <- data.frame(nodes, label= nodes$id)
+            edges <- as_tibble(as_edgelist(grafo))
+            colnames(edges) <- c("from", "to")
+            
+            if (input$visualize_inference == 'poset') {
+              generateVisNetwork(nodes, edges, "other", "")
+            } else {
+              generateVisNetwork(nodes, edges, "other", "")
+            }
+          })
+        }
+        }
     }
   })
   
