@@ -16,6 +16,7 @@ library(ggtree)
 library(ggraph)
 library(igraph)
 library(visNetwork)
+library(RColorBrewer)
 
 
 server <- function(input, output, session) {
@@ -33,6 +34,7 @@ server <- function(input, output, session) {
   app_activated <- reactiveVal(FALSE)
   nresampling <- reactiveVal(FALSE)
   visualizeInferenceOutput <- reactiveVal(TRUE)
+  reactive_selected_result <- reactiveVal(NULL)
   
   #display the genotype table entry if the app is active
   observe({
@@ -68,7 +70,8 @@ server <- function(input, output, session) {
     updateSelectInput(session, "command", selected = "hc")
     updateNumericInput(session, "restarts", value = 10)
     updateNumericInput(session, "seed", value = 12345)
-    output$visualize_inference <- NULL
+    updateSelectInput(session, "visualize_inference", selected = "poset")
+    output$visualize_inference <- renderUI(NULL)
     output$graph_inference <- NULL
     rv <- reactiveValues(deletedColumns = character(0), deletedRows = character(0))
     app_activated(FALSE)
@@ -76,6 +79,7 @@ server <- function(input, output, session) {
     nresampling(NULL)
     output$content <- NULL
     visualizeInferenceOutput(FALSE)
+    resampling_res(NULL)
     }
   
   #resets values when loading a genotype file
@@ -104,6 +108,7 @@ server <- function(input, output, session) {
     nresampling(NULL)
     output$content <- NULL
     visualizeInferenceOutput(FALSE)
+    resampling_res(NULL)
     
   }
   
@@ -136,6 +141,7 @@ server <- function(input, output, session) {
     nresampling(NULL)
     visualizeInferenceOutput(FALSE)
     output$visualize_inference <- NULL
+    resampling_res(NULL)
   }
   
   
@@ -152,7 +158,8 @@ server <- function(input, output, session) {
       z = as.matrix(data),
       x = colnames(data),
       y = rownames(data),
-      type = "heatmap"
+      type = "heatmap",
+      colorscale = colorscale 
     ) %>%
       layout(
         margin = list(l = 50, r = 50, b = 50, t = 50),
@@ -210,7 +217,7 @@ server <- function(input, output, session) {
                 tags$hr(),
                 div(
                   style = "display: flex; justify-content: center; margin-top: 50px;",
-                  visNetworkOutput("posetGraph", width = "50%", height = "400px")
+                  visNetworkOutput("posetGraph", width = "80%", height = "400px")
                 )
               )
             } 
@@ -386,7 +393,7 @@ server <- function(input, output, session) {
             colnames(edges) <- c("from", "to")
             
             
-            generateVisNetwork(nodes, edges, "other", "DAG")
+            generateVisNetwork(nodes, edges, "other", "")
           })
           
         } else {
@@ -552,14 +559,14 @@ server <- function(input, output, session) {
           color = list(
             background = "#23B3E8",
             border = "#013848",
-            highlight = "#E112EB"
+            highlight = "#E34A33"
           ),
           shadow = list(enabled = TRUE, size = 10),
           font = list(size = 10, vadjust = -50)
         ) %>%
         visEdges(
           shadow = FALSE,
-          color = list(color = "#0085AF", highlight = "#E112EB"),
+          color = list(color = "#0085AF", highlight = "#E34A33"),
           arrows = "to"
         )%>% 
         visOptions(nodesIdSelection = TRUE)%>% 
@@ -567,31 +574,76 @@ server <- function(input, output, session) {
     } else {
       
       
+      graph <- graph_from_data_frame(edges, directed = TRUE, vertices = nodes)
+      layout_sugiyama <- layout_with_sugiyama(graph)
+      layout_with_names <- cbind(nodes$id, layout_sugiyama$layout)
+      
+      #number of layers
+      unique_numbers_count <- length(unique(layout_with_names[, 3]))
+      list_of_node_lists <- split(layout_with_names[, 1], layout_with_names[, 3])
+      colors <- brewer.pal(unique_numbers_count, "OrRd")
+
+      
+      nodes$color <- sapply(nodes$id, function(id) {
+        layer <- layout_with_names[layout_with_names[, 1] == id, 3]
+        colors[as.integer(layer)]  
+      })
+      
+
+      
       visNetwork(nodes, edges, main = main_options, background = "white") %>%
-        visIgraphLayout(layout = "layout_with_sugiyama") %>%
+        visIgraphLayout(layout = "layout_with_sugiyama") %>%  # Usa il layout calcolato
         visNodes(
           shape = "dot",
-          size = 5,  
+          size = input$nodeSize, 
           color = list(
-            background = "#23B3E8",
+            background = nodes$color,
             border = "#013848",
             highlight = "#B20062"
           ),
           shadow = list(enabled = TRUE, size = 10),
-          font = list(size = 10, vadjust = -30)
+          font = list(size = input$fontSize, vadjust = -50)
         ) %>%
         visEdges(
           shadow = FALSE,
           color = list(color = "#0085AF", highlight = "#B20062"),
           arrows = list(to = list(enabled = TRUE, scaleFactor = 0.5)),
-          width = 2,
-          length = 2
-        )%>% 
-        visOptions(nodesIdSelection = TRUE)%>% 
-        visInteraction(navigationButtons = TRUE)
+          width = 2
+        ) %>%
+        visOptions(nodesIdSelection = TRUE) %>%
+        visInteraction(navigationButtons = TRUE) %>% 
+        visExport(type = "png", name = "network",
+                  label = paste0("Export as png"),
+                  style="color: white;
+                        background-color: #628291;
+                        border-color: #628291;
+                        border-radius: 3px;
+                        border-style: solid;
+                        box-shadow: none; 
+                        outline: none;") 
     }
   }
   
+  output$downloadCSV <- downloadHandler(
+    filename = function() {
+      paste("inference-data-", Sys.Date(), ".csv")  
+    },
+    content = function(file) {
+      res <- resampling_res()
+      write.csv(res[[input$visualize_inference]], file, row.names = FALSE)
+    }
+  )
+  
+  
+  
+  output$downloadCSV <- downloadHandler(
+    filename = function() {
+      paste("inference-data-", Sys.Date(), ".csv")  
+    },
+    content = function(file) {
+      write.csv(reactive_selected_result(), file, row.names = TRUE)
+    }
+  )
   
   
 ############################ Load or create project  ###########################
@@ -617,14 +669,14 @@ server <- function(input, output, session) {
       project_data <- data.frame(Project_name = "There are no previously saved projects")
     }
     datatable(project_data, rownames = FALSE, colnames = c("Project name"), 
-              selection ="single", options = list(
-                initComplete = JS(
-                  "function(settings, json) {",
-                  "$(this.api().table().header()).css({'background-color': '#232E33', 
-                'color': '#fff'});",
-                  "}")
-              )) 
-  })
+                selection ="single", options = list(
+                  initComplete = JS(
+                    "function(settings, json) {",
+                    "$(this.api().table().header()).css({'background-color': '#232E33', 
+                  'color': '#fff'});",
+                    "}")
+                )) 
+    })
   
   
   
@@ -1190,6 +1242,7 @@ server <- function(input, output, session) {
           )
 
         }
+
       }
   
       resampling_res(res)
@@ -1229,29 +1282,29 @@ server <- function(input, output, session) {
     
     if(visualizeInferenceOutput()) {
       if (input$visualize_inference %in% names(res)) {
-        print("1")
         selected_result <- res[[input$visualize_inference]]
       } else {
-        print("2")
         selected_result <- res$inference[[input$visualize_inference]]
       }
       
       if (input$visualize_inference == "rankingEstimate") {
         output$graph_inference <- NULL
+        selected_result[, "variable"] <- row.names(selected_result)
+        selected_result[, "rank"] <- as.integer(selected_result[, "rank"]) + 1
+        colnames(selected_result)[1] <- "genes"
+        reactive_selected_result (selected_result)
         output$selected_result_output <- renderDT({
-          selected_result[, "variable"] <- row.names(selected_result)
-          selected_result[, "rank"] <- (as.integer(selected_result[, "rank"]) + 1) 
-          colnames(selected_result)[1] <- "genes"
-          datatable(selected_result, options = list(scrollX = TRUE), 
-                    rownames = FALSE, selection ="single")
+          datatable(reactive_selected_result(), options = list(scrollX = TRUE), rownames = FALSE, selection = "single")
         })
+        
       } else if (input$visualize_inference == "poset"){
-        print("qui")
+        
+        colnames(selected_result) <- col_names
         output$graph_inference <- NULL
+        reactive_selected_result (selected_result)
         output$selected_result_output <- renderDT({
-          datatable(selected_result, options = list(scrollX = TRUE), rownames = FALSE, selection ="single")
+          datatable(reactive_selected_result(), options = list(scrollX = TRUE), rownames = FALSE, selection = "single")
         })
-  
         } else {
         colnames(selected_result) <- col_names
         rownames(selected_result) <- col_names
@@ -1259,6 +1312,7 @@ server <- function(input, output, session) {
           showNotification("No DAG available", type = "message")
           output$graph_inference <- NULL
         } else {
+          reactive_selected_result (selected_result)
           grafo <- graph_from_adjacency_matrix(selected_result)
           
           output$graph_inference <- renderVisNetwork({
@@ -1271,12 +1325,9 @@ server <- function(input, output, session) {
             nodes <- data.frame(nodes, label= nodes$id)
             edges <- as_tibble(as_edgelist(grafo))
             colnames(edges) <- c("from", "to")
-            
-            if (input$visualize_inference == 'poset') {
-              generateVisNetwork(nodes, edges, "other", "")
-            } else {
-              generateVisNetwork(nodes, edges, "other", "")
-            }
+
+            generateVisNetwork(nodes, edges, "other", "")
+
           })
         }
         }

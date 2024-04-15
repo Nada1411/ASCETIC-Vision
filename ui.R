@@ -61,7 +61,7 @@ shinyUI(
                      uiOutput("dataFile2"),
                      uiOutput("loadBtn2"),
                      fluidRow(
-                       column(width = 12, style = "margin-top: -7px;", uiOutput("directoryInput"))
+                       column(width = 12, style = "margin-top: -7px; margin-bottom: 30px;", uiOutput("directoryInput"))
                      )
               )
             ),
@@ -118,7 +118,7 @@ shinyUI(
             conditionalPanel(
               condition = "output.dataTable2",
               tags$div("Resampling", style = "font-weight: bold; 
-                       margin-top: 30px; margin-left: 0px; font-size: 17px; 
+                       margin-top: 50px; margin-left: 0px; font-size: 17px; 
                        margin-bottom: 20px;"),  
             ),
             DTOutput("dataTable2"),
@@ -130,7 +130,8 @@ shinyUI(
               condition = "output.dataTable2",
               tags$div(style = "height: 30px;")
             )
-          )
+          ),
+            style = "margin-bottom: 500px;",
         ),
         tabItem(
           tabName = "inference",
@@ -138,7 +139,7 @@ shinyUI(
             style = "margin-left: 10px; margin-right: 10px;",
             fluidRow(
               column(6,
-                     style = "margin-top: -10px;",
+                     style = "margin-top: -10px; margin-bottom: 30px;",
                      selectInput("regularization", "Regularization", 
                                  c("aic", "bic", "loglik", "ebic", 
                                    "pred-loglik", "bde", "bds", "mbde", 
@@ -146,7 +147,8 @@ shinyUI(
                                    "pnal"), 
                                  multiple = TRUE, selected = "aic"),
                      selectInput("command", "Command", c("hc","tabu")),
-                     numericInput("restarts", "Restarts", 10, min = 0)
+                     numericInput("restarts", "Restarts", 10, min = 0),
+                     actionButton("submitBtn", "Invia", class = "custom-button"),
               ),
               column(6, 
                      tags$div(
@@ -158,12 +160,33 @@ shinyUI(
                                      HTML("<strong>Resampling</strong>")),
                        style = "margin-top: 45px;", width = "500px"
                      ),
-                     uiOutput("nresampling", style = "margin-top: 25px;"),
+                     uiOutput("nresampling", style = "margin-top: 25px;")
               ),
             ),
-            actionButton("submitBtn", "Invia", class = "custom-button"),
+            fluidPage(
+              style = "margin-left: -15px; ",
+              fluidRow(
+                column(6,
+                       style = "margin-top: 50px;",
+                       uiOutput("visualize_inference", class = "custom-width")
+                ),
+                column(6, 
+                       conditionalPanel(
+                         class = "no-border-bg",
+                         condition = "output.visualize_inference != null",
+                         downloadButton("downloadCSV", "Download Data as CSV", class = "custom-width1")
+                       ),
+                       conditionalPanel(
+                         class = "no-border-bg",
+                         condition = "output.graph_inference != null",
+                         sliderInput("nodeSize", "Node size", min = 5, max = 30, value = 10),
+                         sliderInput("fontSize", "Font size", min = 5, max = 40, value = 12)
+                       ),
+                ),
+              ),
+            ),
+            
             tags$div(style = "height: 40px;"),
-            uiOutput("visualize_inference"),
             conditionalPanel(
               condition = "output.graph_inference",
               tags$div("Inference output", style = "font-weight: bold; 
@@ -172,7 +195,7 @@ shinyUI(
             ),
             div(
               style = "display: flex; justify-content: center;",
-              visNetworkOutput("graph_inference", width = "80%", height = "500px")
+              visNetworkOutput("graph_inference", width = "80%", height = "500px"),
             ),
             style = "margin-top: 30px;",
             div(

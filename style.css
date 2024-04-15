@@ -101,13 +101,16 @@ div.vis-network div.vis-navigation div.vis-button:hover {
   box-shadow: none !important;
 }
 
+div.vis-network {
+  padding-bottom: 80px;
+}
+Monito
+
 .vis-button:after {
-  font-size: 2em;
   color: #222D32;
 }
 
 .vis-button:hover:after {
-  font-size: 2em;
   color: #79A0B3;
 }
 
@@ -139,4 +142,59 @@ div.vis-network div.vis-navigation div.vis-button:hover {
 
 .vis-button.vis-zoomExtends:after {
   content: "⤧";
+}
+
+.no-border-bg {
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  margin-top: 50px;
+}
+
+.custom-width {
+  width: 100%;        
+  max-width: 300px; 
+  margin-top: 50px;
+}
+
+.custom-width1 {
+  margin-top: 72px;
+  color: white;
+  background-color: #628291;
+  border-color: #628291;
+  border-radius: 3px;
+}
+          
+.custom-width1:hover, .custom-width1:active {
+  color: white;
+  background-color: #242D33;
+  border-color: #242D33;
+}
+
+.irs-bar, .irs-bar-edge, .irs-from, .irs-to, .irs-single {
+  background: #79A0B3 !important; 
+}
+
+.irs-line {
+  background: #222D32; 
+}
+
+.irs-handle {
+  border-color: #628291 !important; 
+}
+
+.irs-single {
+    background: #79A0B3 !important; 
+}
+
+.js-irs-0 .irs-handle,
+.js-irs-1 .irs-handle {
+  width: 2px; 
+  height: 40%; 
+  top: 30%;
+}
+
+#graph_inference {
+    margin: 0;
+    padding: 0;
 }
