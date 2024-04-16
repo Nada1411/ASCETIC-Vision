@@ -26,6 +26,7 @@ server <- function(input, output, session) {
   selected_folder <- reactiveVal(NULL)
   directory_output <- reactiveVal(NULL)
   reshaped_data <- reactiveVal(NULL)
+  reshaped_data_inference <- reactiveVal(NULL)
   genotype_table <- reactiveVal(NULL)
   case <- reactiveVal(NULL)
   resampling_res <- reactiveVal(NULL)
@@ -35,6 +36,7 @@ server <- function(input, output, session) {
   nresampling <- reactiveVal(FALSE)
   visualizeInferenceOutput <- reactiveVal(TRUE)
   reactive_selected_result <- reactiveVal(NULL)
+  reshaped_data_matrix <- reactiveVal(NULL)
   
   #display the genotype table entry if the app is active
   observe({
@@ -262,14 +264,12 @@ server <- function(input, output, session) {
       
       # Detects clicks on table cells
       observe_table_cell_clicked(reshaped_data_matrix)
+      
+      reshaped_data_matrix(reshaped_data_matrix)
     })
     
     return(reshaped_data)
   }
-  
-  
-  
-  
   
   update_outputs <- function(reshaped_data) {
     output$dataTable <- renderDT({
@@ -386,18 +386,18 @@ server <- function(input, output, session) {
           
           output$graphPlot <- renderVisNetwork({
             
-            nodes <- as_tibble(get.vertex.attribute(graph))
-            colnames(nodes) <- "id"
-            nodes <- data.frame(nodes, label= nodes$id)
-            edges <- as_tibble(as_edgelist(graph))
-            colnames(edges) <- c("from", "to")
-            
-            
-            generateVisNetwork(nodes, edges, "other", "")
+            if (ecount(graph) > 0) {
+              nodes <- as_tibble(get.vertex.attribute(graph))
+              colnames(nodes) <- "id"
+              nodes <- data.frame(nodes, label = nodes$id)
+              edges <- as_tibble(as_edgelist(graph))
+              colnames(edges) <- c("from", "to")
+              
+              generateVisNetwork(nodes, edges, "other", "")
+            }
           })
           
         } else {
-          # Se il file non viene trovato, emetti un avvertimento
           showNotification("Seleziona la cartella corretta", type = "warning")
         }
       }
@@ -631,17 +631,6 @@ server <- function(input, output, session) {
     content = function(file) {
       res <- resampling_res()
       write.csv(res[[input$visualize_inference]], file, row.names = FALSE)
-    }
-  )
-  
-  
-  
-  output$downloadCSV <- downloadHandler(
-    filename = function() {
-      paste("inference-data-", Sys.Date(), ".csv")  
-    },
-    content = function(file) {
-      write.csv(reactive_selected_result(), file, row.names = TRUE)
     }
   )
   
@@ -1086,7 +1075,7 @@ server <- function(input, output, session) {
   observeEvent(input$submitBtn, {
     filter <- input$binarization
     filter_perc <- input$binarization_perc
-    genotype_table(reshaped_data())
+    genotype_table(reshaped_data_matrix())
 
     if (is.null(case())) {
       showNotification("Load the files in the previous step", type = "error")
@@ -1159,8 +1148,12 @@ server <- function(input, output, session) {
         showNotification("Load the files in the previous step", type = "error")
       }
       else if(case()=="bulk_single") {
+        
+        column <- intersect(colnames(genotype_table()), colnames(reshaped_data()))
+        row <- intersect(rownames(genotype_table()), rownames(reshaped_data()))
+        reshaped_data_inference(subset(reshaped_data(), rownames(reshaped_data()) %in% row, select = column))
+
         if (input$resamplingFlag == FALSE) {
-          
 
           progress <- withProgress(
             message = 'Ongoing calculation...',
@@ -1168,7 +1161,7 @@ server <- function(input, output, session) {
             value = 0, {
               res <- asceticCCF(
                 dataset = genotype_table(),
-                ccfDataset = reshaped_data(),
+                ccfDataset = reshaped_data_inference(),
                 regularization = input$regularization,
                 command = input$command, 
                 restarts = input$restarts
@@ -1185,7 +1178,7 @@ server <- function(input, output, session) {
             value = 0, {
               res <- asceticCCFResampling(
                 dataset = genotype_table(),
-                ccfDataset = reshaped_data(),
+                ccfDataset = reshaped_data_inference(),
                 vafDataset = reshaped_data2(),
                 nsampling = nsampling,
                 regularization = input$regularization,
@@ -1200,12 +1193,66 @@ server <- function(input, output, session) {
       }
       else if(case()=="bulk_multiple" || case() == "single_cell") {
         
+        models <- readMatrixFiles(selected_folder())
+        models_filtrati_dati <- models
         
+        if (!is.null(input$DeleteRow)) {
+          modelli_da_rimuovere <- unlist(strsplit(input$DeleteRow, ","))
+          models_filtrati <- setdiff(names(models), modelli_da_rimuovere)
+          models_filtrati_dati <- models[models_filtrati]
+        }
+        
+        
+        if (!is.null(input$DeleteColumn)) {
+          for (modello in names(models_filtrati_dati)) {
+            file_data <- models_filtrati_dati[[modello]]
+            file_data <- as.data.frame(file_data)
+
+            if (length(input$DeleteColumn) > 0) {
+              for (col in input$DeleteColumn) {
+                if (col %in% colnames(file_data)) {
+                  col_index <- which(colnames(file_data) == col)
+
+                  
+                  # nodo foglia
+                  if (any(file_data[, col_index] == 1) && all(file_data[col_index, -col_index] == 0)) {
+                    file_data[file_data[, col_index] == 1, col_index] <- 0
+                  }
+
+
+                  # nodo radice
+                  if (any(file_data[col_index, -col_index] == 1) && all(file_data[, col_index] == 0)) {
+                    file_data[col_index, -col_index][file_data[col_index, -col_index] == 1] <- 0
+                  }
+                  
+                  # nodo interno
+                  if (any(file_data[, col_index] == 1) && any(file_data[col_index, -col_index] == 1)) {
+                    indici_riga <- which(file_data[, col_index] == 1)
+                    for (indice in indici_riga) {
+                      file_data[indice, -col_index] <- file_data[indice, -col_index] | file_data[col_index, -col_index]
+                    }
+                    
+                    file_data[indici_riga, col_index] <- 0
+                    file_data[col_index, -col_index] <- 0
+                  }
+                  
+                  file_data <- file_data[-col_index, -col_index]
+                }
+              }
+            }
+            
+            file_data <- as.matrix(file_data)
+
+            models_filtrati_dati[[modello]] <- file_data
+          }
+        }
+        
+      
+
         if (is.null(selected_folder())) {
           showNotification("Select the folder in the previous step", type = "error")
         }
         else if (input$resamplingFlag == FALSE) {
-          models <- readMatrixFiles(selected_folder())
           
           progress <- withProgress(
             message = 'Ongoing calculation...',
@@ -1213,7 +1260,7 @@ server <- function(input, output, session) {
             value = 0, {
               res <- asceticPhylogenies(
                 dataset = genotype_table(),
-                models = models,
+                models = models_filtrati_dati,
                 regularization = input$regularization,
                 command = input$command,
                 restarts = input$restarts
@@ -1224,15 +1271,14 @@ server <- function(input, output, session) {
           
         }
         else {
-          models <- readMatrixFiles(selected_folder())
-
+          
           progress <- withProgress(
             message = 'Ongoing calculation...',
             detail = 'This may take some time...',
             value = 0, {
               res <- asceticPhylogeniesBootstrap(
                 dataset = genotype_table(),
-                models = models,
+                models = models_filtrati_dati,
                 nsampling = nsampling,
                 regularization = input$regularization,
                 command = input$command,
@@ -1244,9 +1290,9 @@ server <- function(input, output, session) {
         }
 
       }
-  
+    
       resampling_res(res)
-  
+
       if(!is.null(res)) {
   
         names_to_remove <- c("dataset", "models", "ccfDataset", "inference")
@@ -1288,6 +1334,7 @@ server <- function(input, output, session) {
       }
       
       if (input$visualize_inference == "rankingEstimate") {
+
         output$graph_inference <- NULL
         selected_result[, "variable"] <- row.names(selected_result)
         selected_result[, "rank"] <- as.integer(selected_result[, "rank"]) + 1
@@ -1298,12 +1345,12 @@ server <- function(input, output, session) {
         })
         
       } else if (input$visualize_inference == "poset"){
-        
         colnames(selected_result) <- col_names
+        rownames(selected_result) <- col_names
         output$graph_inference <- NULL
         reactive_selected_result (selected_result)
         output$selected_result_output <- renderDT({
-          datatable(reactive_selected_result(), options = list(scrollX = TRUE), rownames = FALSE, selection = "single")
+          datatable(reactive_selected_result(), options = list(scrollX = TRUE), rownames = TRUE, selection = "single")
         })
         } else {
         colnames(selected_result) <- col_names
