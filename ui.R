@@ -185,7 +185,7 @@ shinyUI(
             ),
             div(
               style = "display: flex; justify-content: center;",
-              visNetworkOutput("graph_inference", width = "80%", height = "500px"),
+              visNetworkOutput("graph_inference", width = "80%", height = "500px")
             ),
             style = "margin-top: 30px;",
             div(

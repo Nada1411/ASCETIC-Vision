@@ -51,7 +51,6 @@ server <- function(input, output, session) {
     output$graph_inference <- NULL
     rv <- reactiveValues(deletedColumns = character(0), deletedRows = character(0))
     output$content <- NULL
-    app_activated(FALSE)
     reshaped_data2(NULL)
     nresampling(NULL)
     visualizeInferenceOutput(FALSE)
@@ -67,6 +66,7 @@ server <- function(input, output, session) {
     output$selected_result_output <- renderDataTable(NULL)
     updateSelectInput(session, "visualize_inference", selected = "poset")
     output$visualize_inference <- renderUI(NULL)
+    app_activated(FALSE)
   }
   
   #resets values when loading a genotype file
@@ -76,6 +76,7 @@ server <- function(input, output, session) {
     updateSelectInput(session, "DeleteRow", selected = character(0))
     output$heatmapPlot <- plotly::renderPlotly(NULL)
     output$visualize_inference <- NULL
+    output$selected_result_output <- NULL
   }
   
   #resets values when creating a new project
@@ -88,6 +89,7 @@ server <- function(input, output, session) {
     output$DeleteColumn <- NULL
     output$DeleteRow <- NULL
     output$visualize_inference <- NULL
+    app_activated(FALSE)
   }
   
   # returns the list of project names in the output_project folder
