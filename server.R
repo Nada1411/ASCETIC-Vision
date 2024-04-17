@@ -1,23 +1,4 @@
-# server.R
-library(shiny)
-library(shinyjs)
-library("ASCETIC")
-library(DT)
-library(tidyr)
-library(data.table)
-library(reshape2)
-library(dplyr)
-library(shinyFiles)
-library(POSetR)
-library(plotly)
-library(tibble)
-library(shinyWidgets)
-library(ggtree)
-library(ggraph)
-library(igraph)
-library(visNetwork)
-library(RColorBrewer)
-
+source("libraries.R")
 
 server <- function(input, output, session) {
   
@@ -52,100 +33,62 @@ server <- function(input, output, session) {
   })
   
 ############################ Function  #######################################
-  
-  #resets values when loading a new project
-  default_values_load_genotype <- function() {
+
+  reset_common_values <- function() {
     output$directoryInput <- renderUI(NULL)
     output$binarization_perc <- renderUI(NULL)
     output$binarization <- renderUI(NULL)
-    updateSelectInput(session, "DeleteColumn", selected = character(0))
-    updateSelectInput(session, "DeleteRow", selected = character(0))
     output$dataFile2 <- renderUI(NULL)
     output$loadBtn2 <- renderUI(NULL)
     output$dataTable <- NULL
     output$dataTable2 <- NULL
-    output$heatmapPlot <- plotly::renderPlotly(NULL)
-    output$selected_result_output <- renderDataTable(NULL)
     updateCheckboxInput(session, "resamplingFlag", value = FALSE)
     updateNumericInput(session, "nresampling", value = 3)
     updateSelectInput(session, "regularization", selected = "aic")
     updateSelectInput(session, "command", selected = "hc")
     updateNumericInput(session, "restarts", value = 10)
     updateNumericInput(session, "seed", value = 12345)
-    updateSelectInput(session, "visualize_inference", selected = "poset")
-    output$visualize_inference <- renderUI(NULL)
     output$graph_inference <- NULL
     rv <- reactiveValues(deletedColumns = character(0), deletedRows = character(0))
+    output$content <- NULL
     app_activated(FALSE)
     reshaped_data2(NULL)
     nresampling(NULL)
-    output$content <- NULL
     visualizeInferenceOutput(FALSE)
     resampling_res(NULL)
-    }
+  }
+  
+  #resets values when loading a new project
+  default_values_load_genotype <- function() {
+    reset_common_values()
+    updateSelectInput(session, "DeleteColumn", selected = character(0))
+    updateSelectInput(session, "DeleteRow", selected = character(0))
+    output$heatmapPlot <- plotly::renderPlotly(NULL)
+    output$selected_result_output <- renderDataTable(NULL)
+    updateSelectInput(session, "visualize_inference", selected = "poset")
+    output$visualize_inference <- renderUI(NULL)
+  }
   
   #resets values when loading a genotype file
   default_values_load_new_genotype <- function() {
-    output$directoryInput <- renderUI(NULL)
-    output$binarization_perc <- renderUI(NULL)
-    output$binarization <- renderUI(NULL)
+    reset_common_values()
     updateSelectInput(session, "DeleteColumn", selected = character(0))
     updateSelectInput(session, "DeleteRow", selected = character(0))
-    output$dataFile2 <- renderUI(NULL)
-    output$loadBtn2 <- renderUI(NULL)
-    output$dataTable <- NULL
-    output$dataTable2 <- NULL
     output$heatmapPlot <- plotly::renderPlotly(NULL)
-    updateCheckboxInput(session, "resamplingFlag", value = FALSE)
-    updateNumericInput(session, "nresampling", value = 3)
-    updateSelectInput(session, "regularization", selected = "aic")
-    updateSelectInput(session, "command", selected = "hc")
-    updateNumericInput(session, "restarts", value = 10)
-    updateNumericInput(session, "seed", value = 12345)
     output$visualize_inference <- NULL
-    output$graph_inference <- NULL
-    output$selected_result_output <- NULL
-    rv <- reactiveValues(deletedColumns = character(0), deletedRows = character(0))
-    reshaped_data2(NULL)
-    nresampling(NULL)
-    output$content <- NULL
-    visualizeInferenceOutput(FALSE)
-    resampling_res(NULL)
-    
   }
   
   #resets values when creating a new project
   default_values_create_project <- function() {
-    output$directoryInput <- renderUI(NULL)
-    output$binarization_perc <- renderUI(NULL)
-    output$binarization <- renderUI(NULL)
-    output$dataFile2 <- renderUI(NULL)
-    output$loadBtn2 <- renderUI(NULL)
-    output$dataTable <- NULL
-    output$dataTable2 <- NULL
+    reset_common_values()
     output$heatmapPlot <- plotly::renderPlotly({NULL})
     output$switchViewBtn <- renderUI(NULL)
-    updateCheckboxInput(session, "resamplingFlag", value = FALSE)
-    updateNumericInput(session, "nresampling", value = 3)
-    updateSelectInput(session, "regularization", selected = "aic")
-    updateSelectInput(session, "command", selected = "hc")
-    updateNumericInput(session, "restarts", value = 10)
-    updateNumericInput(session, "seed", value = 12345)
-    output$graph_inference <- NULL
     output$selected_result_output <- NULL
     orig <- reactiveVal(NULL)
-    rv <- reactiveValues(deletedColumns = character(0), deletedRows = character(0))
     output$DeleteColumn <- NULL
     output$DeleteRow <- NULL
-    output$content <- NULL
-    app_activated(FALSE)
-    reshaped_data2(NULL)
-    nresampling(NULL)
-    visualizeInferenceOutput(FALSE)
     output$visualize_inference <- NULL
-    resampling_res(NULL)
   }
-  
   
   # returns the list of project names in the output_project folder
   get_project_names <- function() {
@@ -198,8 +141,7 @@ server <- function(input, output, session) {
             
             poset_graph <- make_graph(edges = sorted_genes, directed = TRUE)
           }
-          
-          
+
           output$posetGraph <- renderVisNetwork({
             
             nodes <- as_tibble(get.vertex.attribute(poset_graph))
@@ -207,12 +149,10 @@ server <- function(input, output, session) {
             nodes <- data.frame(nodes, label= nodes$id)
             edges <- as_tibble(as_edgelist(poset_graph))
             colnames(edges) <- c("from", "to")
-            
-            
+
             generateVisNetwork(nodes, edges, "poset", "Poset")
           })
   
-          
           output$content <- renderUI({
             if (!is.null(poset_graph) && length(poset_graph) > 0) {
               tagList(
@@ -225,12 +165,10 @@ server <- function(input, output, session) {
             } 
           })
         }
-    }
+      }
     })
-  
   }
-  
- 
+
   # selection/deletion of row and column
   modify_reshaped_data <- function(reshaped_data) {
     observe({
@@ -267,7 +205,6 @@ server <- function(input, output, session) {
       
       reshaped_data_matrix(reshaped_data_matrix)
     })
-    
     return(reshaped_data)
   }
   
@@ -279,10 +216,7 @@ server <- function(input, output, session) {
       generate_heatmap_plot(reshaped_data)
     })
   }
-  
-  
-  
-  
+
   observe_data_modification <- function(reshaped_data) {
     observe({
       reshaped_data <- modify_reshaped_data(reshaped_data)
@@ -404,7 +338,6 @@ server <- function(input, output, session) {
     })
   }
   
-  
   readMatrixFiles <- function(directory_path) {
     
     readMatrix <- function(filePath) {
@@ -429,11 +362,9 @@ server <- function(input, output, session) {
       
       matrix_list[[matrix_name]] <- matrix_data
     }
-    
     return(matrix_list)
   }
-  
-  
+ 
   bulk_single_case <- function() {
     
     output$dataFile2 <- renderUI({
@@ -634,7 +565,10 @@ server <- function(input, output, session) {
     }
   )
   
-  
+  saveData <- function(data, name) {
+    write.csv(data, name, row.names=TRUE)
+  }
+ 
 ############################ Load or create project  ###########################
   
   ##Create
@@ -667,8 +601,6 @@ server <- function(input, output, session) {
                 )) 
     })
   
-  
-  
   ##Load
   
   observeEvent(input$loadProjBtn, {
@@ -692,7 +624,6 @@ server <- function(input, output, session) {
           
           project_name <- project_names()[clicked_row, 1]
           
-          
           parti <- unlist(strsplit(project_name, "_"))
           ultime_due_parole <- tail(parti, 2)
           nuova_stringa <- paste(ultime_due_parole, collapse = "_")
@@ -700,7 +631,6 @@ server <- function(input, output, session) {
           
           project_folder <- file.path("output_project", project_name)
           project_files <- list.files(project_folder)
-          
           
           #Read first the file of each case
           for (file in project_files) {
@@ -735,7 +665,6 @@ server <- function(input, output, session) {
             }
           }
           
-          
           #Read the file that are for all the 3 cases
           for (file in project_files) {
             file_name <- tools::file_path_sans_ext(file)
@@ -753,7 +682,6 @@ server <- function(input, output, session) {
                 generate_heatmap_plot(data)
               })
 
-
               if(case() == "bulk_single") {
                 bulk_single_case()
               }
@@ -767,7 +695,6 @@ server <- function(input, output, session) {
             }
             else if (file_name == "parameters") {
               parameters <- read.csv(file_directory)
-
 
               # Ciclo attraverso ogni riga del dataframe
               for (i in 1:nrow(parameters)) {
@@ -818,7 +745,6 @@ server <- function(input, output, session) {
                   updateNumericInput(session, "seed", value = val_seed)
                 }
               }
-              
             }
             else if (file_name == "resampling_res") {
               resampling_res(readRDS(file_directory))
@@ -836,14 +762,10 @@ server <- function(input, output, session) {
             }
           }
         }    
-        
-        })
+      })
       updateTabItems(session, "sidebarMenu", "input")
     }
   })
-
-
-  
 
   # Function to render UI for deleting columns
   render_delete_column_ui <- function(input_id, label, data, selected_columns = NULL) {
@@ -853,8 +775,6 @@ server <- function(input, output, session) {
     })
     return(output)
   }
-  
-  
   
   # Function to render UI for deleting rows
   render_delete_row_ui <- function(input_id, label, data, selected_rows = NULL) {
@@ -866,7 +786,6 @@ server <- function(input, output, session) {
   }
   
 ############################ Input data  #######################################
-  
   
   # Displaying the resampling file, in the case where there are three columns 
   #(single bulk case) the table is represented.
@@ -935,8 +854,6 @@ server <- function(input, output, session) {
           )
           
           modified_data <- reshaped_data()
-          
-          
           output$DeleteColumn <- render_delete_column_ui("DeleteColumn", 
                                                          "Delete column", 
                                                          reshaped_data())
@@ -944,18 +861,13 @@ server <- function(input, output, session) {
                                                    "Delete row", 
                                                    reshaped_data())
         
-          
           observe({
-            
             modified_data <- modify_reshaped_data(modified_data)
-            
             output$dataTable <- renderDT({
               datatable(modified_data, options = list(scrollX = TRUE), 
                         selection ="single")
             })
-            
             reshaped_data(modified_data)
-            
             output$heatmapPlot <- renderPlotly({
               generate_heatmap_plot(modified_data)
             })
@@ -990,7 +902,6 @@ server <- function(input, output, session) {
           shinyDirChoose(input, "dir", roots = c(wd = getwd()), 
                          filetypes = c("", "txt"))
           
-          
         } else if (colnames(data)[2]=="CELL") {
           default_values_load_new_genotype()
           case("single_cell")
@@ -1005,7 +916,6 @@ server <- function(input, output, session) {
           
           reshaped_data(data %>%
             column_to_rownames(var = "PATIENT"))
-          
 
           output$DeleteColumn <- render_delete_column_ui("DeleteColumn", 
                                                          "Delete column", 
@@ -1016,21 +926,15 @@ server <- function(input, output, session) {
                                                    reshaped_data())
           
           observe({
-            
             modified_data <- modify_reshaped_data(reshaped_data())
-            
-
             output$dataTable <- renderDT({
               datatable(modified_data, options = list(scrollX = TRUE), 
                         selection ="single")
             })
-            
             reshaped_data(modified_data)
-            
             output$heatmapPlot <- renderPlotly({
               generate_heatmap_plot(reshaped_data())
             })
-            
           })
           
           output$binarization <- renderUI({
@@ -1047,7 +951,6 @@ server <- function(input, output, session) {
             shinyDirButton("dir", "Select a folder", title = "Select a folder", 
                            multiple = FALSE)
           })
-          
           
           observe({
             req(input$dir)
@@ -1068,7 +971,6 @@ server <- function(input, output, session) {
     }
   })
 
-  
 ############################ Inference  ########################################
   
   # filter the genotype table according to the case
@@ -1134,14 +1036,12 @@ server <- function(input, output, session) {
     }
   })
 
-  
   res <- NULL
   #inference function
   observeEvent(input$submitBtn, {
     tryCatch({
-    
+      
       nsampling <- input$nresampling
-  
       set.seed(input$seed)
       
       if (is.null(case())) {
@@ -1168,9 +1068,7 @@ server <- function(input, output, session) {
               )
             }
           )
-          
-        }
-        else {
+        } else {
           
           progress <- withProgress(
             message = 'Ongoing calculation...',
@@ -1187,8 +1085,6 @@ server <- function(input, output, session) {
               )
             }
           )
-          
-
         }
       }
       else if(case()=="bulk_multiple" || case() == "single_cell") {
@@ -1202,7 +1098,6 @@ server <- function(input, output, session) {
           models_filtrati_dati <- models[models_filtrati]
         }
         
-        
         if (!is.null(input$DeleteColumn)) {
           for (modello in names(models_filtrati_dati)) {
             file_data <- models_filtrati_dati[[modello]]
@@ -1213,12 +1108,10 @@ server <- function(input, output, session) {
                 if (col %in% colnames(file_data)) {
                   col_index <- which(colnames(file_data) == col)
 
-                  
                   # nodo foglia
                   if (any(file_data[, col_index] == 1) && all(file_data[col_index, -col_index] == 0)) {
                     file_data[file_data[, col_index] == 1, col_index] <- 0
                   }
-
 
                   # nodo radice
                   if (any(file_data[col_index, -col_index] == 1) && all(file_data[, col_index] == 0)) {
@@ -1231,28 +1124,21 @@ server <- function(input, output, session) {
                     for (indice in indici_riga) {
                       file_data[indice, -col_index] <- file_data[indice, -col_index] | file_data[col_index, -col_index]
                     }
-                    
                     file_data[indici_riga, col_index] <- 0
                     file_data[col_index, -col_index] <- 0
                   }
-                  
                   file_data <- file_data[-col_index, -col_index]
                 }
               }
             }
-            
             file_data <- as.matrix(file_data)
-
             models_filtrati_dati[[modello]] <- file_data
           }
         }
         
-      
-
         if (is.null(selected_folder())) {
           showNotification("Select the folder in the previous step", type = "error")
-        }
-        else if (input$resamplingFlag == FALSE) {
+        } else if (input$resamplingFlag == FALSE) {
           
           progress <- withProgress(
             message = 'Ongoing calculation...',
@@ -1267,10 +1153,7 @@ server <- function(input, output, session) {
               )
             }
           )
-
-          
-        }
-        else {
+        } else {
           
           progress <- withProgress(
             message = 'Ongoing calculation...',
@@ -1286,26 +1169,20 @@ server <- function(input, output, session) {
               )
             }
           )
-
         }
-
       }
-    
       resampling_res(res)
 
       if(!is.null(res)) {
   
         names_to_remove <- c("dataset", "models", "ccfDataset", "inference")
-  
         names <- setdiff(names(res), names_to_remove)
         names <- c(names, names(res$inference))
-        
         visualizeInferenceOutput(TRUE)
         output$visualize_inference <- renderUI({selectInput("visualize_inference", 
                                                             "Output inference", 
                                                             c(names),
                                                             selected = "poset")})
-    
       }
       }, error = function(e) {
         visualizeInferenceOutput(FALSE)
@@ -1320,8 +1197,6 @@ server <- function(input, output, session) {
   observe({
     req(input$sidebarMenu == "inference")
     req(input$visualize_inference)
-
-
     res <- resampling_res()
     output$selected_result_output <- NULL
     col_names <- colnames(res$dataset)
@@ -1343,7 +1218,6 @@ server <- function(input, output, session) {
         output$selected_result_output <- renderDT({
           datatable(reactive_selected_result(), options = list(scrollX = TRUE), rownames = FALSE, selection = "single")
         })
-        
       } else if (input$visualize_inference == "poset"){
         colnames(selected_result) <- col_names
         rownames(selected_result) <- col_names
@@ -1352,7 +1226,7 @@ server <- function(input, output, session) {
         output$selected_result_output <- renderDT({
           datatable(reactive_selected_result(), options = list(scrollX = TRUE), rownames = TRUE, selection = "single")
         })
-        } else {
+      } else {
         colnames(selected_result) <- col_names
         rownames(selected_result) <- col_names
         if (all(selected_result == 0)) {
@@ -1366,32 +1240,21 @@ server <- function(input, output, session) {
             nodi_da_rimuovere <- V(grafo)[degree(grafo, mode = "in") == 0 & 
                                             degree(grafo, mode = "out") == 0]
             grafo <- delete.vertices(grafo, nodi_da_rimuovere)
-            
             nodes <- as_tibble(get.vertex.attribute(grafo))
             colnames(nodes) <- "id"
             nodes <- data.frame(nodes, label= nodes$id)
             edges <- as_tibble(as_edgelist(grafo))
             colnames(edges) <- c("from", "to")
-
+            
             generateVisNetwork(nodes, edges, "other", "")
 
           })
         }
-        }
+      }
     }
   })
-  
-  
-  
-
-
 
 ############################ Save project  ################################# 
-
-  saveData <- function(data, name) {
-    write.csv(data, name, row.names=TRUE)
-  }
-  
   
   observe({
     if (input$project_name != "") {
@@ -1417,7 +1280,6 @@ server <- function(input, output, session) {
                   "nresampling", "restarts", "regularization", "command", 
                   "seed", "output_inference")
       
-
       sequence <- ifelse((!is.null(input$binarization)), input$binarization, NA)
       sequence <- c(sequence, ifelse((!is.null(input$DeleteColumn)), 
                                      toString(input$DeleteColumn), NA))
@@ -1435,7 +1297,6 @@ server <- function(input, output, session) {
                                      input$command, NA))
       sequence <- c(sequence, ifelse((!is.null(input$seed)), input$seed, NA))
 
-      
       matrix_data <- matrix(data = c(values, sequence),
                              nrow = length(values),
                              ncol = 2,
@@ -1452,14 +1313,12 @@ server <- function(input, output, session) {
         saveRDS(resampling_res(), directory_file)
       }
       
-      
       if (case()=="bulk_single") {
         directory_file <- paste0(directory_complete, "/resampling_table.csv")
         if (!(is.null(reshaped_data2()))) {
           saveData(reshaped_data2() , directory_file)
         }
       } else if (case()=="bulk_multiple") {
-        
         
         values <- c("directory", "binarization_perc")
         sequence <- ifelse(!is.null(input$dir), toString(input$dir), NA)
@@ -1489,7 +1348,6 @@ server <- function(input, output, session) {
         matrix_dataframe <- as.data.frame(matrix_data)
         colnames(matrix_dataframe) <- c("name", "value")
         
-        
         directory_file <- paste0(directory_complete, "/parameters_single_cell.csv")
         saveData(matrix_dataframe , directory_file)
       }
@@ -1500,5 +1358,4 @@ server <- function(input, output, session) {
       showNotification("Nothing to save", type = "error")
     }
   })
-
 }

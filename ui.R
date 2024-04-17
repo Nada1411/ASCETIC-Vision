@@ -1,18 +1,4 @@
-library(shiny)
-library(shinyjs)
-library("ASCETIC")
-library(DT)
-library(tidyr)
-library(data.table)
-library(reshape2)
-library(dplyr)
-library(shinyFiles)
-library(igraph)
-library(shinycssloaders)
-library("bsplus")
-library(shinydashboard)
-library(visNetwork)
-
+source("libraries.R")
 
 shinyUI(
   dashboardPage(
@@ -61,7 +47,8 @@ shinyUI(
                      uiOutput("dataFile2"),
                      uiOutput("loadBtn2"),
                      fluidRow(
-                       column(width = 12, style = "margin-top: -7px; margin-bottom: 30px;", uiOutput("directoryInput"))
+                       column(width = 12, style = "margin-top: -7px; 
+                              margin-bottom: 30px;", uiOutput("directoryInput"))
                      )
               )
             ),
@@ -174,13 +161,16 @@ shinyUI(
                        conditionalPanel(
                          class = "no-border-bg",
                          condition = "output.visualize_inference != null",
-                         downloadButton("downloadCSV", "Download Data as CSV", class = "custom-width1")
+                         downloadButton("downloadCSV", "Download Data as CSV", 
+                                        class = "custom-width1")
                        ),
                        conditionalPanel(
                          class = "no-border-bg",
                          condition = "output.graph_inference != null",
-                         sliderInput("nodeSize", "Node size", min = 5, max = 30, value = 10),
-                         sliderInput("fontSize", "Font size", min = 5, max = 40, value = 12)
+                         sliderInput("nodeSize", "Node size", min = 5,
+                                     max = 30, value = 10),
+                         sliderInput("fontSize", "Font size", min = 5, 
+                                     max = 40, value = 12)
                        ),
                 ),
               ),
