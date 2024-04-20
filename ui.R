@@ -4,8 +4,11 @@ shinyUI(
   dashboardPage(
     dashboardHeader(
       title = "ASCETIC 2.0",
-      tags$li(class = "dropdown", style = "float: right; color: white; font-weight: bold; padding: 15px 10px 0 0;", uiOutput("project_info"))
-      
+      tags$li(class = "dropdown", 
+              style = "display: flex; justify-content: center; 
+              align-items: center; color: #222D32; font-size: 15px;
+              font-weight: bold; padding: 15px 10px 0 0;", 
+              uiOutput("project_info"))      
     ),
     dashboardSidebar(
       sidebarMenu(
@@ -105,7 +108,7 @@ shinyUI(
             conditionalPanel(
               condition = "output.dataTable2",
               tags$div("Resampling", style = "font-weight: bold; 
-                       margin-top: 50px; margin-left: 0px; font-size: 17px; 
+                       margin-top: 85px; margin-left: 0px; font-size: 17px; 
                        margin-bottom: 20px;"),  
             ),
             DTOutput("dataTable2"),
@@ -217,14 +220,6 @@ shinyUI(
                      selectInput("command_confEstimation", "Command", c("hc","tabu")),
                      numericInput("restarts_confEstimation", "Restarts", 10, min = 0),
                      numericInput("iteration_confEstimation", "Iteration", 10, min = 0),
-                     conditionalPanel(
-                       condition = "output.visualize_inference != null",
-                       actionButton("submitBtn_confEstimation", "Invia", class = "custom-button"),
-                     ),
-                     conditionalPanel(
-                       condition = "output.visualize_inference == null",
-                       bsButton("submitBtn_confEstimation_deactivated", "Invia"),
-                     ),
               ),
               column(6, 
                      tags$div(
@@ -238,6 +233,14 @@ shinyUI(
                      ),
                      uiOutput("nresampling_confEstimation", style = "margin-top: 25px;")
               ),
+            ),
+            conditionalPanel(
+              condition = "output.visualize_inference != null",
+              actionButton("submitBtn_confEstimation", "Invia", class = "custom-button"),
+            ),
+            conditionalPanel(
+              condition = "output.visualize_inference == null",
+              bsButton("submitBtn_confEstimation_deactivated", "Invia"),
             ),
             style = "margin-top: 30px;",
           )

@@ -588,7 +588,7 @@ server <- function(input, output, session) {
     },
     content = function(file) {
       res <- resampling_res()
-      write.csv(res[[input$visualize_inference]], file, row.names = FALSE)
+      write.csv(res[[input$visualize_inference]], file, row.names = TRUE, col.names = TRUE)
     }
   )
   
