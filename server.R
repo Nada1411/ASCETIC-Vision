@@ -1038,11 +1038,19 @@ server <- function(input, output, session) {
     if (is.null(case())) {
       showNotification("Upload the genomic file in the previous step", type = "error")
     }
-    #else if (is.null(input$regularization)||is.null(input$command) || 
-    #         is.null(input$restarts) || is.null(input$seed) || 
-    #         (input$resamplingFlag && is.null(input$nresampling))){
-    #  showNotification("Fill in all fields", type = "error")
-    #}
+    else if (input$resamplingFlag == FALSE) {
+      if (is.null(input$regularization)||is.null(input$command) || 
+             is.null(input$restarts) || is.null(input$seed)){
+          showNotification("Fill in all fields", type = "error")
+      }
+    }
+    else if (input$resamplingFlag == TRUE) {
+      if (is.null(input$regularization)||is.null(input$command) || 
+          is.null(input$restarts) || is.null(input$seed) || 
+          is.null(input$nresampling)){
+        showNotification("Fill in all fields", type = "error")
+      }
+    }
     else if (case() == "bulk_single" || case() == "single_cell") {
       #filter the genotype table
       genotype_table(ifelse(genotype_table() >= filter, 1, 0))
