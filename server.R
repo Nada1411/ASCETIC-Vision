@@ -37,6 +37,22 @@ server <- function(input, output, session) {
                       choices = input$regularization)
   })
   
+  observeEvent(input$binarization, {
+    x <- input$binarization
+    if (x > 1){
+      updateNumericInput(session, "binarization", value = 1)
+      showNotification("Allowed range 0-1 ", type = "warning")
+    }
+  })
+  
+  observeEvent(input$binarization_perc, {
+    x <- input$binarization_perc
+    if (x > 1){
+      updateNumericInput(session, "binarization_perc", value = 1)
+      showNotification("Allowed range 0-1 ", type = "warning")
+    }
+  })
+  
 ############################ Function  #######################################
 
   reset_common_values <- function() {
@@ -61,7 +77,6 @@ server <- function(input, output, session) {
     visualizeInferenceOutput(FALSE)
     resampling_res(NULL)
     output$project_info <- renderUI(NULL)
-    print("C")
     output$heatmapPlot <- renderUI({NULL})
 
   }
@@ -343,7 +358,7 @@ server <- function(input, output, session) {
           })
           
         } else {
-          showNotification("Seleziona la cartella corretta", type = "warning")
+          showNotification("Select the correct folder", type = "warning")
         }
       }
     })
@@ -824,15 +839,20 @@ server <- function(input, output, session) {
   observeEvent(input$loadBtn2, {
     #resampling file
     inFile2 <- input$dataFile2
-    data2 <- read.table(inFile2$datapath, sep = "\t", header = TRUE, 
-                        stringsAsFactors = FALSE)
-    reshaped_data2(data2)
-
-    output$dataTable2 <- renderDT({
-      datatable(data2, options = list(scrollX = TRUE), selection ="single")
-    })
-
-    reshaped_data2(data2)
+    
+    if (is.null(inFile2)) {
+      showNotification("Please select a file", type = "error")
+    } else {
+      data2 <- read.table(inFile2$datapath, sep = "\t", header = TRUE, 
+                          stringsAsFactors = FALSE)
+      reshaped_data2(data2)
+  
+      output$dataTable2 <- renderDT({
+        datatable(data2, options = list(scrollX = TRUE), selection ="single")
+      })
+  
+      reshaped_data2(data2)
+    }
   })
   
   reshaped_data <- reactiveVal(NULL)
@@ -841,7 +861,7 @@ server <- function(input, output, session) {
     inFile <- input$dataFile
     
     if (is.null(inFile)) {
-      showNotification("File not loaded.", type = "error")
+      showNotification("Please select a file", type = "error")
     } else {
       data <- read.table(inFile$datapath, sep = "\t", header = TRUE, 
                          stringsAsFactors = FALSE)

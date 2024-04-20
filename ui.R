@@ -79,13 +79,8 @@ shinyUI(
                        condition = "input.loadBtn > 0 || input.loadProjBtn > 0",
                        uiOutput("switchViewBtn")
                      ),
-                     style = "margin-top: 50px;"  
+              style = "margin-top: 50px; margin-bottom: 20px;"  
               )
-            ),
-            conditionalPanel(
-              condition = "output.dataTable && output.heatmapPlot",
-              tags$div("Genotype", style = "font-weight: bold; margin-top: 30px; 
-                       margin-left: 0px; font-size: 17px; margin-bottom: 20px;"),  
             ),
             fluidRow(
               column(12,
