@@ -846,13 +846,18 @@ server <- function(input, output, session) {
     } else {
       data2 <- read.table(inFile2$datapath, sep = "\t", header = TRUE, 
                           stringsAsFactors = FALSE)
-      reshaped_data2(data2)
-  
-      output$dataTable2 <- renderDT({
-        datatable(data2, options = list(scrollX = TRUE), selection ="single")
-      })
-  
-      reshaped_data2(data2)
+      
+      if (!"REF_COUNT" %in% colnames(data2)) {
+        showNotification("Select the correct resampling file in the previous step", type = "error")
+      } else {
+        reshaped_data2(data2)
+        
+        output$dataTable2 <- renderDT({
+          datatable(data2, options = list(scrollX = TRUE), selection ="single")
+        })
+        
+        reshaped_data2(data2)
+      }
     }
   })
   
