@@ -28,6 +28,14 @@ body {
   background-color: #242D33;
   border-color: #242D33;
 }
+
+.custom-button-confEstimation {
+  pointer-events: none;
+  color: white;
+  background-color: #C8DBF1;
+  border-color: #C8DBF1;
+  border-radius: 3px;
+}
           
 table.dataTable tbody tr:hover {
   background-color: #7BA1B3 !important;
@@ -200,3 +208,18 @@ Monito
     margin-left: 0px !important;
     padding-left: 0px !important;
   }
+
+#project_info {
+  display: block;
+}
+
+.dropdown-menu > li > a {
+  padding: 10px;
+}
+
+#plotContainer {
+  cursor: default;
+}
+#plotContainer.empty {
+  cursor: auto;
+}

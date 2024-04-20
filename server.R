@@ -32,6 +32,11 @@ server <- function(input, output, session) {
     } 
   })
   
+  observe({
+    updateSelectInput(session, "regularization_confEstimation",
+                      choices = input$regularization)
+  })
+  
 ############################ Function  #######################################
 
   reset_common_values <- function() {
@@ -55,6 +60,10 @@ server <- function(input, output, session) {
     nresampling(NULL)
     visualizeInferenceOutput(FALSE)
     resampling_res(NULL)
+    output$project_info <- renderUI(NULL)
+    print("C")
+    output$heatmapPlot <- renderUI({NULL})
+
   }
   
   #resets values when loading a new project
@@ -62,7 +71,6 @@ server <- function(input, output, session) {
     reset_common_values()
     updateSelectInput(session, "DeleteColumn", selected = character(0))
     updateSelectInput(session, "DeleteRow", selected = character(0))
-    output$heatmapPlot <- plotly::renderPlotly(NULL)
     output$selected_result_output <- renderDataTable(NULL)
     updateSelectInput(session, "visualize_inference", selected = "poset")
     output$visualize_inference <- renderUI(NULL)
@@ -74,7 +82,6 @@ server <- function(input, output, session) {
     reset_common_values()
     updateSelectInput(session, "DeleteColumn", selected = character(0))
     updateSelectInput(session, "DeleteRow", selected = character(0))
-    output$heatmapPlot <- plotly::renderPlotly(NULL)
     output$visualize_inference <- NULL
     output$selected_result_output <- NULL
   }
@@ -82,7 +89,6 @@ server <- function(input, output, session) {
   #resets values when creating a new project
   default_values_create_project <- function() {
     reset_common_values()
-    output$heatmapPlot <- plotly::renderPlotly({NULL})
     output$switchViewBtn <- renderUI(NULL)
     output$selected_result_output <- NULL
     orig <- reactiveVal(NULL)
@@ -95,8 +101,11 @@ server <- function(input, output, session) {
   # returns the list of project names in the output_project folder
   get_project_names <- function() {
     project_names <- list.files("output_project")
-    project_names <- data.frame(project_names)
-    return(project_names)
+    file_infos <- file.info(file.path("output_project", project_names))
+    last_modified <- file_infos$mtime
+    project_info <- data.frame(project_names, last_modified)
+  
+    return(project_info)
   }
   
   # generate heatmap
@@ -105,9 +114,7 @@ server <- function(input, output, session) {
       z = as.matrix(data),
       x = colnames(data),
       y = rownames(data),
-      type = "heatmap",
-      colorscale = colorscale 
-    ) %>%
+      type = "heatmap"    ) %>%
       layout(
         margin = list(l = 50, r = 50, b = 50, t = 50),
         xaxis = list(side = "bottom"),
@@ -197,8 +204,10 @@ server <- function(input, output, session) {
         datatable(reshaped_data_matrix, options = list(scrollX = TRUE), 
                   selection = "single")
       })
+    
       
-      output$heatmapPlot <- renderPlotly({
+      
+      output$heatmapPlot <- renderUI({
         generate_heatmap_plot(reshaped_data_matrix)
       })
       
@@ -214,7 +223,7 @@ server <- function(input, output, session) {
     output$dataTable <- renderDT({
       datatable(reshaped_data, options = list(scrollX = TRUE), selection = "single")
     })
-    output$heatmapPlot <- renderPlotly({
+    output$heatmapPlot <- renderUI({
       generate_heatmap_plot(reshaped_data)
     })
   }
@@ -229,7 +238,7 @@ server <- function(input, output, session) {
       
       reshaped_data(reshaped_data)
       
-      output$heatmapPlot <- renderPlotly({
+      output$heatmapPlot <- renderUI({
         generate_heatmap_plot(reshaped_data)
       })
       
@@ -416,7 +425,7 @@ server <- function(input, output, session) {
       
       reshaped_data(modified_data)
       
-      output$heatmapPlot <- renderPlotly({
+      output$heatmapPlot <- renderUI({
         generate_heatmap_plot(modified_data)
       })
     })
@@ -464,7 +473,7 @@ server <- function(input, output, session) {
       
       reshaped_data(modified_data)
       
-      output$heatmapPlot <- renderPlotly({
+      output$heatmapPlot <- renderUI({
         generate_heatmap_plot(modified_data)
       })
     })
@@ -590,18 +599,29 @@ server <- function(input, output, session) {
   # Show the table with the names of existing projects
   output$projectList <- renderDT({
     project_data <- project_names()
+    
     if (nrow(project_data) == 0) {
       project_data <- data.frame(Project_name = "There are no previously saved projects")
+    } else {
+      project_data$Data_type <- sapply(strsplit(project_data[,1], "_"), function(x) paste(tail(x, 2), collapse = "_"))
+      project_data$Data_type <- gsub("_", " ", project_data$Data_type) 
+      project_data[,1] <- sub("_[^_]+$", "", sub("_[^_]+$", "", project_data[,1]))
+      project_data <- project_data[, c(1, 3, 2)]
+      project_data[,3] <- format(as.POSIXct(project_data[,3], format = "%Y-%m-%dT%H:%M:%SZ"), format = "%Y-%m-%d %H:%M:%S")
+      
     }
-    datatable(project_data, rownames = FALSE, colnames = c("Project name"), 
-                selection ="single", options = list(
-                  initComplete = JS(
-                    "function(settings, json) {",
-                    "$(this.api().table().header()).css({'background-color': '#232E33', 
+
+    datatable(project_data, rownames = FALSE, colnames = c("Project name", "Data type", "Last modified"), 
+              selection ="single", options = list(
+                initComplete = JS(
+                  "function(settings, json) {",
+                  "$(this.api().table().header()).css({'background-color': '#232E33', 
                   'color': '#fff'});",
-                    "}")
-                )) 
-    })
+                  "}")
+              )) 
+  })
+  
+  
   
   ##Load
   
@@ -609,10 +629,9 @@ server <- function(input, output, session) {
     default_values_load_genotype()
     if (is.null(input$projectList_cell_clicked$row) || 
         is.null(input$projectList_cell_clicked$col)) {
-      showNotification("Select the project you want to upload", type = "error")
+      showNotification("Please select an existing project", type = "error")
       
     } else {
-      
       #Visualise switch bottom
       output$switchViewBtn <- renderUI({
         actionButton("switchViewBtn", "Switch View", class = "custom-button")
@@ -680,7 +699,7 @@ server <- function(input, output, session) {
                 datatable(data, options = list(scrollX = TRUE), selection ="single")
               })
               
-              output$heatmapPlot <- renderPlotly({
+              output$heatmapPlot <- renderUI({
                 generate_heatmap_plot(data)
               })
 
@@ -765,7 +784,17 @@ server <- function(input, output, session) {
           }
         }    
       })
+      
+
       updateTabItems(session, "sidebarMenu", "input")
+      
+      selected_row <- input$projectList_rows_selected
+      project_data <- project_names()
+      project_name <- project_data$project_names[selected_row]
+      project_name <- sub("_[^_]+$", "", sub("_[^_]+$", "", project_name))
+      output$project_info <- renderUI({
+        tags$div(paste("Project:", project_name))
+      })
     }
   })
 
@@ -870,7 +899,7 @@ server <- function(input, output, session) {
                         selection ="single")
             })
             reshaped_data(modified_data)
-            output$heatmapPlot <- renderPlotly({
+            output$heatmapPlot <- renderUI({
               generate_heatmap_plot(modified_data)
             })
           })
@@ -934,7 +963,7 @@ server <- function(input, output, session) {
                         selection ="single")
             })
             reshaped_data(modified_data)
-            output$heatmapPlot <- renderPlotly({
+            output$heatmapPlot <- renderUI({
               generate_heatmap_plot(reshaped_data())
             })
           })
@@ -1256,6 +1285,43 @@ server <- function(input, output, session) {
     }
   })
 
+
+############################ Confidence estimation #############################
+
+  # Callback function to handle click on input resamplingFlag
+  observeEvent(input$resamplingFlag_confEstimation, {
+    # Check whether the resampling flag has been activated.
+    if (input$resamplingFlag_confEstimation) {
+      # Check if case is not null and if it's bulk_single, whether the file is loaded
+      if (!is.null(case()) && (case() != "bulk_single" || 
+                               !is.null(input$dataTable2) || 
+                               !is.null(reshaped_data2()))) {
+        ## da sistemare quando gestirò le sessioni anche per questa fase
+        #if (!is.null(nresampling())) {
+        #  output$nresampling_confEstimation <- renderUI({
+        #    numericInput("nresampling", "Number of samplings", nresampling(), min = 3)
+        #  })
+        #} else {
+        output$nresampling_confEstimation <- renderUI({
+          numericInput("nresampling", "Number of samplings", 3, min = 3)
+        })
+        #}
+      } else {
+        # If the condition is not met, show a warning
+        showNotification("Load the resampling file in the previous step", type = "warning")
+        # Update resamplingFlag back to FALSE
+        updateCheckboxInput(session, "resamplingFlag_confEstimation", value = FALSE)
+      }
+    } else {
+      # If resamplingFlag is off, remove the nresampling input
+      output$nresampling_confEstimation <- NULL
+    }
+  })
+  
+  observeEvent(input$submitBtn_confEstimation_deactivated, {
+    showNotification("Perform the inference phase first", type = "message")
+  })
+  
 ############################ Save project  ################################# 
   
   observe({

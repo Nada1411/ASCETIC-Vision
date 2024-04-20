@@ -1,6 +1,6 @@
 "","name","value"
 "1","binarization","0.5"
-"2","del_col","ALK, BCORL1"
+"2","del_col","ALK, BCORL1, APC"
 "3","del_row","aml_ohsu_2022_2016_BA2816"
 "4","flag_resampling","TRUE"
 "5","nresampling","6"

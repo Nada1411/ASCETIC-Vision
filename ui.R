@@ -2,13 +2,18 @@ source("libraries.R")
 
 shinyUI(
   dashboardPage(
-    dashboardHeader(title = "ASCETIC 2.0"),
+    dashboardHeader(
+      title = "ASCETIC 2.0",
+      tags$li(class = "dropdown", style = "float: right; color: white; font-weight: bold; padding: 15px 10px 0 0;", uiOutput("project_info"))
+      
+    ),
     dashboardSidebar(
       sidebarMenu(
         id = "sidebarMenu",
         menuItem("Home page", tabName = "home", icon = icon("home")),
         menuItem("Input data", tabName = "input", icon = icon("database")),
         menuItem("Inference", tabName = "inference", icon = icon("chart-line")),
+        menuItem("Confidence estimation", tabName = "confidence_estimation", icon = icon("think-peaks")),
         menuItem("Save project", tabName = "save", icon = icon("save"))
       )
     ),
@@ -78,7 +83,7 @@ shinyUI(
               )
             ),
             conditionalPanel(
-              condition = "output.dataTable",
+              condition = "output.dataTable && output.heatmapPlot",
               tags$div("Genotype", style = "font-weight: bold; margin-top: 30px; 
                        margin-left: 0px; font-size: 17px; margin-bottom: 20px;"),  
             ),
@@ -86,7 +91,7 @@ shinyUI(
               column(12,
                      conditionalPanel(
                        condition = "input.switchViewBtn % 2 == 1",
-                       plotly::plotlyOutput("heatmapPlot")
+                       uiOutput("heatmapPlot")
                      )
               )
             ),
@@ -193,6 +198,47 @@ shinyUI(
               DTOutput("selected_result_output")
             ),
             style = "margin-bottom: 500px;",
+          )
+        ),
+        tabItem(
+          tabName = "confidence_estimation",
+          fluidPage(
+            style = "margin-left: 10px; margin-right: 10px;",
+            fluidRow(
+              column(6,
+                     style = "margin-top: -10px; margin-bottom: 30px;",
+                     selectInput("regularization_confEstimation", "Regularization", 
+                                 c("aic", "bic", "loglik", "ebic", 
+                                   "pred-loglik", "bde", "bds", "mbde", 
+                                   "bdla", "k2", "fnml", "qnml", "nal", 
+                                   "pnal"), 
+                                 multiple = TRUE, selected = "aic"),
+                     selectInput("command_confEstimation", "Command", c("hc","tabu")),
+                     numericInput("restarts_confEstimation", "Restarts", 10, min = 0),
+                     numericInput("iteration_confEstimation", "Iteration", 10, min = 0),
+                     conditionalPanel(
+                       condition = "output.visualize_inference != null",
+                       actionButton("submitBtn_confEstimation", "Invia", class = "custom-button"),
+                     ),
+                     conditionalPanel(
+                       condition = "output.visualize_inference == null",
+                       bsButton("submitBtn_confEstimation_deactivated", "Invia"),
+                     ),
+              ),
+              column(6, 
+                     tags$div(
+                       numericInput("seed_confEstimation", "Seed", 12345, min = 0),
+                       style = "margin-top: -10px;"
+                     ),
+                     tags$div(
+                       checkboxInput("resamplingFlag_confEstimation", 
+                                     HTML("<strong>Resampling</strong>")),
+                       style = "margin-top: 45px;", width = "500px"
+                     ),
+                     uiOutput("nresampling_confEstimation", style = "margin-top: 25px;")
+              ),
+            ),
+            style = "margin-top: 30px;",
           )
         ),
         tabItem(
