@@ -135,7 +135,6 @@ shinyUI(
                                  multiple = TRUE, selected = "aic"),
                      selectInput("command", "Command", c("hc","tabu")),
                      numericInput("restarts", "Restarts", 10, min = 0),
-                     actionButton("submitBtn", "Invia", class = "custom-button"),
               ),
               column(6, 
                      tags$div(
@@ -149,28 +148,35 @@ shinyUI(
                      ),
                      uiOutput("nresampling", style = "margin-top: 25px;")
               ),
+              column(12, align = "left",
+                     actionButton("submitBtn", "Invia", class = "custom-button")
+              )
             ),
             fluidPage(
               style = "margin-left: -15px; ",
               fluidRow(
                 column(6,
                        style = "margin-top: 50px;",
-                       uiOutput("visualize_inference", class = "custom-width")
+                       uiOutput("visualize_inference", class = "custom-width"),
+                       conditionalPanel(
+                         class = "no-border-bg",
+                         condition = "output.graph_inference != null",
+                         sliderInput("fontSize", "Font size", min = 5, 
+                                     max = 40, value = 12)
+                       ),
                 ),
                 column(6, 
                        conditionalPanel(
                          class = "no-border-bg",
                          condition = "output.visualize_inference != null",
                          downloadButton("downloadCSV", "Download Data as CSV", 
-                                        class = "custom-width1")
+                                        class = "custom-width1"),
                        ),
                        conditionalPanel(
                          class = "no-border-bg",
                          condition = "output.graph_inference != null",
                          sliderInput("nodeSize", "Node size", min = 5,
-                                     max = 30, value = 10),
-                         sliderInput("fontSize", "Font size", min = 5, 
-                                     max = 40, value = 12)
+                                     max = 30, value = 10)
                        ),
                 ),
               ),
