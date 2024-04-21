@@ -18,7 +18,7 @@ server <- function(input, output, session) {
   visualizeInferenceOutput <- reactiveVal(TRUE)
   reactive_selected_result <- reactiveVal(NULL)
   reshaped_data_matrix <- reactiveVal(NULL)
-  
+
   #display the genotype table entry if the app is active
   observe({
     if (!app_activated()) {
@@ -58,8 +58,6 @@ server <- function(input, output, session) {
   reset_common_values <- function() {
     output$directoryInput <- renderUI(NULL)
     output$binarization_perc <- renderUI(NULL)
-    output$binarization <- renderUI(NULL)
-    output$dataFile2 <- renderUI(NULL)
     output$loadBtn2 <- renderUI(NULL)
     output$dataTable <- NULL
     output$dataTable2 <- NULL
@@ -587,8 +585,8 @@ server <- function(input, output, session) {
       paste("inference-data-", Sys.Date(), ".csv")  
     },
     content = function(file) {
-      res <- resampling_res()
-      write.csv(res[[input$visualize_inference]], file, row.names = TRUE, col.names = TRUE)
+      res <- reactive_selected_result()
+      write.csv(res, file, row.names = TRUE, col.names = TRUE)
     }
   )
   
@@ -1278,6 +1276,7 @@ server <- function(input, output, session) {
         selected_result[, "variable"] <- row.names(selected_result)
         selected_result[, "rank"] <- as.integer(selected_result[, "rank"]) + 1
         colnames(selected_result)[1] <- "genes"
+        rownames(selected_result) <- NULL
         reactive_selected_result (selected_result)
         output$selected_result_output <- renderDT({
           datatable(reactive_selected_result(), options = list(scrollX = TRUE), rownames = FALSE, selection = "single")
@@ -1297,7 +1296,9 @@ server <- function(input, output, session) {
           showNotification("No DAG available", type = "message")
           output$graph_inference <- NULL
         } else {
-          reactive_selected_result (selected_result)
+          reactive_selected_result(selected_result)
+          print("1")
+          print(reactive_selected_result())
           grafo <- graph_from_adjacency_matrix(selected_result)
           
           output$graph_inference <- renderVisNetwork({
@@ -1370,7 +1371,6 @@ server <- function(input, output, session) {
     project_name <- paste0(project_name, "_", case())
     directory_output <- "output_project/"
     directory_complete <- paste0(directory_output, project_name)
-    print(input$project_name)
     if (input$project_name == "") {
       showNotification("Enter a name for the project to be saved", type = "warning")
     }
