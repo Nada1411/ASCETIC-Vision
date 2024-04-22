@@ -527,7 +527,16 @@ server <- function(input, output, session) {
           arrows = "to"
         )%>% 
         visOptions(nodesIdSelection = TRUE)%>% 
-        visInteraction(navigationButtons = TRUE)
+        visInteraction(navigationButtons = TRUE)%>% 
+        visExport(type = "png", name = "network",
+                  label = paste0("Export as png"),
+                  style="color: white;
+                        background-color: #628291;
+                        border-color: #628291;
+                        border-radius: 3px;
+                        border-style: solid;
+                        box-shadow: none; 
+                        outline: none;") 
     } else {
       
       
