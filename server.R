@@ -61,6 +61,7 @@ server <- function(input, output, session) {
     output$loadBtn2 <- renderUI(NULL)
     output$dataTable <- NULL
     output$dataTable2 <- NULL
+    output$dataFile2 <- NULL
     updateCheckboxInput(session, "resamplingFlag", value = FALSE)
     updateNumericInput(session, "nresampling", value = 3)
     updateSelectInput(session, "regularization", selected = "aic")
@@ -849,7 +850,6 @@ server <- function(input, output, session) {
         showNotification("Select the correct resampling file in the previous step", type = "error")
       } else {
         reshaped_data2(data2)
-        
         output$dataTable2 <- renderDT({
           datatable(data2, options = list(scrollX = TRUE), selection ="single")
         })
