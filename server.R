@@ -570,8 +570,8 @@ server <- function(input, output, session) {
         )%>% 
         visOptions(nodesIdSelection = TRUE)%>% 
         visInteraction(navigationButtons = TRUE)%>% 
-        visExport(type = "png", name = "network",
-                  label = paste0("Export as png"),
+        visExport(type = "pdf", name = "network",
+                  label = paste0("Export as pdf"),
                   style="color: white;
                         background-color: #628291;
                         border-color: #628291;
@@ -620,8 +620,8 @@ server <- function(input, output, session) {
         ) %>%
         visOptions(nodesIdSelection = TRUE) %>%
         visInteraction(navigationButtons = TRUE) %>% 
-        visExport(type = "png", name = "network",
-                  label = paste0("Export as png"),
+        visExport(type = "pdf", name = "network",
+                  label = paste0("Export as pdf"),
                   style="color: white;
                         background-color: #628291;
                         border-color: #628291;
