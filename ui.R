@@ -154,7 +154,6 @@ shinyUI(
               column(12, align = "left",
                      actionButton("submitBtn", "Invia", class = "custom-button")
               ),
-              actionButton("stopBtn", "Stop", style = "display: none;"),
             ),
             fluidPage(
               style = "margin-left: -15px; ",

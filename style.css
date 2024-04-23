@@ -121,6 +121,9 @@ Monito
 .vis-button:hover:after {
   color: #79A0B3;
 }
+.helpIcon {
+  color: #79A0B3;
+}
 
 .vis-button.vis-up:after {
   content: "▲";

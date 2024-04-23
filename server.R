@@ -28,9 +28,21 @@ server <- function(input, output, session) {
   
   output$dataFile <- renderUI({
     if (app_activated()) {
-      fileInput("dataFile", "Genotype")
-    } 
+      tagList(
+        div(style = "display: flex; align-items: center;", 
+            fileInput("dataFile", 
+                      label = span("Genotype ", 
+                                   tags$i(id = "helpIcon", 
+                                          class = "fa fa-question-circle", 
+                                          style="margin-left: 5px;"))),
+            bsTooltip(id = "helpIcon", 
+                      title = "Select the file containing the information about the sample taken and its CCF.", 
+                      placement = "right", trigger = "hover")
+        )
+      )
+    }
   })
+  
   
   observe({
     updateSelectInput(session, "regularization_confEstimation",
@@ -394,8 +406,21 @@ server <- function(input, output, session) {
   bulk_single_case <- function() {
     
     output$dataFile2 <- renderUI({
-      fileInput("dataFile2", "Resampling")
+      tagList(
+        div(style = "display: flex; align-items: center;", 
+            fileInput("dataFile2", 
+                      label = span("Resampling ", 
+                                   tags$i(id = "helpIcon2", 
+                                          class = "fa fa-question-circle", 
+                                          style="margin-left: 5px;"))),
+            bsTooltip(id = "helpIcon2", 
+                      title = "If you want to perform the inference with resampling upload the file", 
+                      placement = "right", trigger = "hover")
+        )
+      )
     })
+    
+    
     output$loadBtn2 <- renderUI({
       actionButton("loadBtn2", "Load", class = "custom-button")
     })
@@ -558,7 +583,7 @@ server <- function(input, output, session) {
 
       
       visNetwork(nodes, edges, main = main_options, background = "white") %>%
-        visIgraphLayout(layout = "layout_with_sugiyama") %>%  # Usa il layout calcolato
+        visIgraphLayout(layout = "layout_with_sugiyama") %>%  
         visNodes(
           shape = "dot",
           size = input$nodeSize, 
@@ -627,15 +652,20 @@ server <- function(input, output, session) {
     if (nrow(project_data) == 0) {
       project_data <- data.frame(Project_name = "There are no previously saved projects")
     } else {
-      project_data$Data_type <- sapply(strsplit(project_data[,1], "_"), function(x) paste(tail(x, 2), collapse = "_"))
+      project_data$Data_type <- sapply(strsplit(project_data[,1], "_"), 
+                                       function(x) paste(tail(x, 2), 
+                                                         collapse = "_"))
       project_data$Data_type <- gsub("_", " ", project_data$Data_type) 
       project_data[,1] <- sub("_[^_]+$", "", sub("_[^_]+$", "", project_data[,1]))
       project_data <- project_data[, c(1, 3, 2)]
-      project_data[,3] <- format(as.POSIXct(project_data[,3], format = "%Y-%m-%dT%H:%M:%SZ"), format = "%Y-%m-%d %H:%M:%S")
+      project_data[,3] <- format(as.POSIXct(project_data[,3], 
+                                            format = "%Y-%m-%dT%H:%M:%SZ"), 
+                                 format = "%Y-%m-%d %H:%M:%S")
       
     }
 
-    datatable(project_data, rownames = FALSE, colnames = c("Project name", "Data type", "Last modified"), 
+    datatable(project_data, rownames = FALSE, 
+              colnames = c("Project name", "Data type", "Last modified"), 
               selection ="single", options = list(
                 initComplete = JS(
                   "function(settings, json) {",
@@ -700,10 +730,19 @@ server <- function(input, output, session) {
                 if (parametro == "binarization_perc") {
                   val_bin_perc <- as.numeric(value)
                   output$binarization_perc <- renderUI({
-                    numericInput("binarization_perc", 
-                                 "Filter to binarize percentage", 
-                                 value = val_bin_perc, min = 0, 
-                                 max = 1, step = 0.01)
+                    tagList(
+                      div(style = "display: flex; align-items: center;",
+                          numericInput("binarization_perc", 
+                                       label = span("Filter to binarize percentage ", 
+                                                    tags$i(id = "helpIcon4", 
+                                                           class = "fa fa-question-circle", 
+                                                           style="margin-left: 5px;")), 
+                                       value = 1, min = 0, max = 1, step = 0.01),
+                          bsTooltip(id = "helpIcon4", 
+                                    title = "Specify the threshold you want to use as a filter to binarize the percentage of mutated regions in each sample of the database to be inputted into the next inference phase.", 
+                                    placement = "right", trigger = "hover")
+                      )
+                    )
                   })
                 }
               }
@@ -750,8 +789,20 @@ server <- function(input, output, session) {
                 if (parametro == "binarization") {
                   val_bin <- as.numeric(value)
                   output$binarization <- renderUI({
-                    numericInput("binarization", "Filter to binarize", 
-                                 value = val_bin, min = 0, max = 1, step = 0.01)
+                    tagList(
+                      div(style = "display: flex; align-items: center;",
+                          numericInput("binarization", 
+                                       label = span("Filter to binarize ", 
+                                                    tags$i(id = "helpIcon3", 
+                                                           class = "fa fa-question-circle", 
+                                                           style="margin-left: 5px;")), 
+                                       value = val_bin, min = 0, max = 1, 
+                                       step = 0.01),
+                          bsTooltip(id = "helpIcon3", 
+                                    title = "Specify which threshold you want to use as a filter to binarize the database to be inputted into the next inference phase.", 
+                                    placement = "right", trigger = "hover")
+                      )
+                    )
                   })
                 }
                 else if (parametro =="del_col") {
@@ -856,7 +907,8 @@ server <- function(input, output, session) {
                           stringsAsFactors = FALSE)
       
       if (!"REF_COUNT" %in% colnames(data2)) {
-        showNotification("Select the correct resampling file in the previous step", type = "error")
+        showNotification("Select the correct resampling file in the previous step", 
+                         type = "error")
       } else {
         reshaped_data2(data2)
         output$dataTable2 <- renderDT({
@@ -889,8 +941,19 @@ server <- function(input, output, session) {
         )
 
         output$binarization <- renderUI({
-          numericInput("binarization", "Filter to binarize", value = 1, 
-                       min = 0, max = 1, step = 0.01)
+          tagList(
+            div(style = "display: flex; align-items: center;",
+                numericInput("binarization", 
+                             label = span("Filter to binarize ", 
+                                          tags$i(id = "helpIcon3", 
+                                                 class = "fa fa-question-circle", 
+                                                 style="margin-left: 5px;")), 
+                             value = val_bin, min = 0, max = 1, step = 0.01),
+                bsTooltip(id = "helpIcon3", 
+                          title = "Specify which threshold you want to use as a filter to binarize the database to be inputted into the next inference phase.", 
+                          placement = "right", trigger = "hover")
+            )
+          )
         })
         output$switchViewBtn <- renderUI({
           actionButton("switchViewBtn", "Switch View", class = "custom-button")
@@ -937,8 +1000,19 @@ server <- function(input, output, session) {
           })
           
           output$binarization <- renderUI({
-            numericInput("binarization", "Filter to binarize", value = 1, 
-                         min = 0, max = 1, step = 0.01)
+            tagList(
+              div(style = "display: flex; align-items: center;",
+                  numericInput("binarization", 
+                               label = span("Filter to binarize ", 
+                                            tags$i(id = "helpIcon3", 
+                                                   class = "fa fa-question-circle", 
+                                                   style="margin-left: 5px;")), 
+                               value = val_bin, min = 0, max = 1, step = 0.01),
+                  bsTooltip(id = "helpIcon3", 
+                            title = "Specify which threshold you want to use as a filter to binarize the database to be inputted into the next inference phase.", 
+                            placement = "right", trigger = "hover")
+              )
+            )
           })
           
           output$switchViewBtn <- renderUI({
@@ -946,9 +1020,21 @@ server <- function(input, output, session) {
           })
           
           output$binarization_perc <- renderUI({
-            numericInput("binarization_perc", "Filter to binarize percentage", 
-                         value = 1, min = 0, max = 1, step = 0.01)
+            tagList(
+              div(style = "display: flex; align-items: center;",
+                  numericInput("binarization_perc", 
+                               label = span("Filter to binarize percentage ", 
+                                            tags$i(id = "helpIcon4", 
+                                                   class = "fa fa-question-circle", 
+                                                   style="margin-left: 5px;")), 
+                               value = 1, min = 0, max = 1, step = 0.01),
+                  bsTooltip(id = "helpIcon4", 
+                            title = "Specify the threshold you want to use as a filter to binarize the percentage of mutated regions in each sample of the database to be inputted into the next inference phase.", 
+                            placement = "right", trigger = "hover")
+              )
+            )
           })
+          
           
           handle_dataTable_cell_clicked(reshaped_data(), "ID")
           
@@ -1001,8 +1087,19 @@ server <- function(input, output, session) {
           })
           
           output$binarization <- renderUI({
-            numericInput("binarization", "Filter to binarize", value = 1, 
-                         min = 0, max = 1, step = 0.01)
+            tagList(
+              div(style = "display: flex; align-items: center;",
+                  numericInput("binarization", 
+                               label = span("Filter to binarize ", 
+                                            tags$i(id = "helpIcon3", 
+                                                   class = "fa fa-question-circle", 
+                                                   style="margin-left: 5px;")), 
+                               value = val_bin, min = 0, max = 1, step = 0.01),
+                  bsTooltip(id = "helpIcon3", 
+                            title = "Specify which threshold you want to use as a filter to binarize the database to be inputted into the next inference phase.", 
+                            placement = "right", trigger = "hover")
+              )
+            )
           })
           output$switchViewBtn <- renderUI({
             actionButton("switchViewBtn", "Switch View", class = "custom-button")
