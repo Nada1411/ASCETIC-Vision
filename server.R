@@ -754,7 +754,7 @@ server <- function(input, output, session) {
                                                     tags$i(id = "helpIcon4", 
                                                            class = "fa fa-question-circle", 
                                                            style="margin-left: 5px;")), 
-                                       value = 1, min = 0, max = 1, step = 0.01),
+                                       value = val_bin_perc, min = 0, max = 1, step = 0.01),
                           bsTooltip(id = "helpIcon4", 
                                     title = "Specify the threshold you want to use as a filter to binarize the percentage of mutated regions in each sample of the database to be inputted into the next inference phase.", 
                                     placement = "right", trigger = "hover")
@@ -965,7 +965,7 @@ server <- function(input, output, session) {
                                           tags$i(id = "helpIcon3", 
                                                  class = "fa fa-question-circle", 
                                                  style="margin-left: 5px;")), 
-                             value = val_bin, min = 0, max = 1, step = 0.01),
+                             value = 1, min = 0, max = 1, step = 0.01),
                 bsTooltip(id = "helpIcon3", 
                           title = "Specify which threshold you want to use as a filter to binarize the database to be inputted into the next inference phase.", 
                           placement = "right", trigger = "hover")
@@ -1024,7 +1024,7 @@ server <- function(input, output, session) {
                                             tags$i(id = "helpIcon3", 
                                                    class = "fa fa-question-circle", 
                                                    style="margin-left: 5px;")), 
-                               value = val_bin, min = 0, max = 1, step = 0.01),
+                               value = 1, min = 0, max = 1, step = 0.01),
                   bsTooltip(id = "helpIcon3", 
                             title = "Specify which threshold you want to use as a filter to binarize the database to be inputted into the next inference phase.", 
                             placement = "right", trigger = "hover")
@@ -1119,7 +1119,7 @@ server <- function(input, output, session) {
                                             tags$i(id = "helpIcon3", 
                                                    class = "fa fa-question-circle", 
                                                    style="margin-left: 5px;")), 
-                               value = val_bin, min = 0, max = 1, step = 0.01),
+                               value = 1, min = 0, max = 1, step = 0.01),
                   bsTooltip(id = "helpIcon3", 
                             title = "Specify which threshold you want to use as a filter to binarize the database to be inputted into the next inference phase.", 
                             placement = "right", trigger = "hover")
