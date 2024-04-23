@@ -226,3 +226,7 @@ Monito
 #plotContainer.empty {
   cursor: auto;
 }
+
+$(document).ready(function(){
+        $('[data-toggle=\"tooltip\"]').tooltip(); 
+      });

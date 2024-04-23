@@ -70,6 +70,7 @@ server <- function(input, output, session) {
   reset_common_values <- function() {
     output$directoryInput <- renderUI(NULL)
     output$binarization_perc <- renderUI(NULL)
+    output$binarization <- renderUI(NULL)
     output$loadBtn2 <- renderUI(NULL)
     output$dataTable <- NULL
     output$dataTable2 <- NULL
@@ -471,8 +472,16 @@ server <- function(input, output, session) {
     })
     
     output$directoryInput <- renderUI({
-      shinyDirButton("dir", "Select a folder", 
-                     title = "Select a folder", multiple = FALSE)
+      tagList(
+        div(style = "display: flex; align-items: center; gap: 5px;",
+            shinyDirButton("dir", "Select a folder", title = "Select a folder", 
+                           multiple = FALSE),
+            tags$i(id = "helpIconFolder", class = "fa fa-question-circle", 
+                   style="cursor: pointer;", `data-toggle`="tooltip", 
+                   `data-placement`="right",
+                   title="To perform the inference operation, it's necessary to select the folder containing the files corresponding to each row of the database along with its respective Directed Acyclic Graph (DAG).")
+        )
+      )
     })
     
     observe({
@@ -519,8 +528,16 @@ server <- function(input, output, session) {
     })
     
     output$directoryInput <- renderUI({
-      shinyDirButton("dir", "Select a folder", title = "Select a folder", 
-                     multiple = FALSE)
+      tagList(
+        div(style = "display: flex; align-items: center; gap: 5px;",
+            shinyDirButton("dir", "Select a folder", title = "Select a folder", 
+                           multiple = FALSE),
+            tags$i(id = "helpIconFolder", class = "fa fa-question-circle", 
+                   style="cursor: pointer;", `data-toggle`="tooltip", 
+                   `data-placement`="right",
+                   title="To perform the inference operation, it's necessary to select the folder containing the files corresponding to each row of the database along with its respective Directed Acyclic Graph (DAG).")
+        )
+      )
     })
     shinyDirChoose(input, "dir", roots = c(wd = getwd()), filetypes = c("", "txt"))
     
@@ -1039,8 +1056,16 @@ server <- function(input, output, session) {
           handle_dataTable_cell_clicked(reshaped_data(), "ID")
           
           output$directoryInput <- renderUI({
-            shinyDirButton("dir", "Seleziona una cartella", 
-                           title = "Seleziona una cartella", multiple = FALSE)
+            tagList(
+              div(style = "display: flex; align-items: center; gap: 5px;",
+                  shinyDirButton("dir", "Select a folder", title = "Select a folder", 
+                                 multiple = FALSE),
+                  tags$i(id = "helpIconFolder", class = "fa fa-question-circle", 
+                         style="cursor: pointer;", `data-toggle`="tooltip", 
+                         `data-placement`="right",
+                         title="To perform the inference operation, it's necessary to select the folder containing the files corresponding to each row of the database along with its respective Directed Acyclic Graph (DAG).")
+              )
+            )
           })
           
           observe({
@@ -1108,8 +1133,16 @@ server <- function(input, output, session) {
           handle_dataTable_cell_clicked(reshaped_data(), "PATIENT")
           
           output$directoryInput <- renderUI({
-            shinyDirButton("dir", "Select a folder", title = "Select a folder", 
-                           multiple = FALSE)
+            tagList(
+              div(style = "display: flex; align-items: center; gap: 5px;",
+                  shinyDirButton("dir", "Select a folder", title = "Select a folder", 
+                                 multiple = FALSE),
+                  tags$i(id = "helpIconFolder", class = "fa fa-question-circle", 
+                         style="cursor: pointer;", `data-toggle`="tooltip", 
+                         `data-placement`="right",
+                         title="To perform the inference operation, it's necessary to select the folder containing the files corresponding to each row of the database along with its respective Directed Acyclic Graph (DAG).")
+              )
+            )
           })
           
           observe({
