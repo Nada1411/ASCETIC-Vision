@@ -51,7 +51,6 @@ server <- function(input, output, session) {
   
   observeEvent(input$binarization, {
     x <- input$binarization
-    print(x)
     if ( !is.na(x) && (x > 1 || x < 0)){
       updateNumericInput(session, "binarization", value = 1)
       showNotification("Allowed range 0-1 ", type = "warning")
@@ -1196,7 +1195,6 @@ server <- function(input, output, session) {
     filter <- input$binarization
     filter_perc <- input$binarization_perc
     genotype_table(reshaped_data_matrix())
-    print(input$seed)
     # filter the genotype table according to the case
     if (is.null(case())) {
       showNotification("Upload the genomic file in the previous step", type = "error")
@@ -1247,7 +1245,6 @@ server <- function(input, output, session) {
           
           nsampling <- input$nresampling
           set.seed(input$seed)
-          print(genotype_table())
           if(case()=="bulk_single") {
             column <- intersect(colnames(genotype_table()), colnames(reshaped_data()))
             row <- intersect(rownames(genotype_table()), rownames(reshaped_data()))
