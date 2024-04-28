@@ -228,5 +228,10 @@ Monito
 }
 
 $(document).ready(function(){
-        $('[data-toggle=\"tooltip\"]').tooltip(); 
-      });
+  $('[data-toggle=\"tooltip\"]').tooltip(); 
+});
+
+$(document).on('click', '#geneInfoLink', function() {
+  window.open($(this).attr('href'), '_blank');
+  return false;
+});

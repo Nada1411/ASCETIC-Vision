@@ -23,3 +23,7 @@ library(shinyBS)
 library(future)
 library("htmltools")
 library("bsplus")
+if (!require("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+
+library(EnsDb.Hsapiens.v86)

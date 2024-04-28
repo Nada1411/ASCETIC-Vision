@@ -167,6 +167,7 @@ shinyUI(
                          sliderInput("fontSize", "Font size", min = 5, 
                                      max = 40, value = 12)
                        ),
+                       uiOutput("gene_graph_tab", style = "margin-top: 50px;"),
                 ),
                 column(6, 
                        conditionalPanel(
