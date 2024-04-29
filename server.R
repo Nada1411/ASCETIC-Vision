@@ -19,13 +19,14 @@ server <- function(input, output, session) {
   reactive_selected_result <- reactiveVal(NULL)
   reshaped_data_matrix <- reactiveVal(NULL)
 
-  #display the genotype table entry if the app is active
+  # Active app
   observe({
     if (!app_activated()) {
       app_activated(TRUE)
     }
   })
   
+  # Display the genotype table entry if the app is active
   output$dataFile <- renderUI({
     if (app_activated()) {
       tagList(
@@ -42,13 +43,15 @@ server <- function(input, output, session) {
       )
     }
   })
-  
-  
+
+  # Regularization selectable in the confidence enstimation step are those that 
+  # were used during the inference step
   observe({
     updateSelectInput(session, "regularization_confEstimation",
                       choices = input$regularization)
   })
   
+  # Binarization field constraint management
   observeEvent(input$binarization, {
     x <- input$binarization
     if ( !is.na(x) && (x > 1 || x < 0)){
@@ -57,6 +60,7 @@ server <- function(input, output, session) {
     }
   })
   
+  # Percentage binarization field constraint management
   observeEvent(input$binarization_perc, {
     x <- input$binarization_perc
     if ( !is.na(x) && (x > 1 || x < 0)){
@@ -77,46 +81,46 @@ server <- function(input, output, session) {
     output$dataTable2 <- NULL
     output$dataFile2 <- NULL
     output$gene_graph_tab <- NULL
+    output$graph_inference <- NULL
+    output$content <- NULL
+    output$project_info <- renderUI(NULL)
+    output$heatmapPlot <- renderUI({NULL})
     updateCheckboxInput(session, "resamplingFlag", value = FALSE)
     updateNumericInput(session, "nresampling", value = 3)
     updateSelectInput(session, "regularization", selected = "aic")
     updateSelectInput(session, "command", selected = "hc")
     updateNumericInput(session, "restarts", value = 10)
     updateNumericInput(session, "seed", value = 12345)
-    output$graph_inference <- NULL
     rv <- reactiveValues(deletedColumns = character(0), deletedRows = character(0))
-    output$content <- NULL
     reshaped_data2(NULL)
     nresampling(NULL)
     visualizeInferenceOutput(FALSE)
     resampling_res(NULL)
-    output$project_info <- renderUI(NULL)
-    output$heatmapPlot <- renderUI({NULL})
     case(NULL)
     selected_folder(NULL)
   }
   
-  #resets values when loading a new project
+  # Resets values when loading a new project
   default_values_load_genotype <- function() {
     reset_common_values()
+    output$selected_result_output <- renderDataTable(NULL)
+    output$visualize_inference <- renderUI(NULL)
     updateSelectInput(session, "DeleteColumn", selected = character(0))
     updateSelectInput(session, "DeleteRow", selected = character(0))
-    output$selected_result_output <- renderDataTable(NULL)
     updateSelectInput(session, "visualize_inference", selected = "poset")
-    output$visualize_inference <- renderUI(NULL)
     app_activated(FALSE)
   }
   
-  #resets values when loading a genotype file
+  # Resets values when loading a genotype file
   default_values_load_new_genotype <- function() {
     reset_common_values()
-    updateSelectInput(session, "DeleteColumn", selected = character(0))
-    updateSelectInput(session, "DeleteRow", selected = character(0))
     output$visualize_inference <- NULL
     output$selected_result_output <- NULL
+    updateSelectInput(session, "DeleteColumn", selected = character(0))
+    updateSelectInput(session, "DeleteRow", selected = character(0))
   }
   
-  #resets values when creating a new project
+  # Resets values when creating a new project
   default_values_create_project <- function() {
     reset_common_values()
     output$switchViewBtn <- renderUI(NULL)
@@ -128,7 +132,7 @@ server <- function(input, output, session) {
     app_activated(FALSE)
   }
   
-  #resets values when submit btm in inference
+  # Resets values when submit btm in inference
   default_values_inference <- function() {
     output$graph_inference <- NULL
     output$selected_result_output <- renderDataTable(NULL)
@@ -136,7 +140,7 @@ server <- function(input, output, session) {
     visualizeInferenceOutput(FALSE)
   }
   
-  # returns the list of project names in the output_project folder
+  # Returns the list of project names in the output_project folder
   get_project_names <- function() {
     project_names <- list.files("output_project")
     file_infos <- file.info(file.path("output_project", project_names))
@@ -146,7 +150,7 @@ server <- function(input, output, session) {
     return(project_info)
   }
   
-  # generate heatmap
+  # Generate heatmap
   generate_heatmap_plot <- function(data) {
     heatmap_plot <- plot_ly(
       z = as.matrix(data),
@@ -216,7 +220,7 @@ server <- function(input, output, session) {
     })
   }
 
-  # selection/deletion of row and column
+  # Selection/deletion of row and column
   modify_reshaped_data <- function(reshaped_data) {
     observe({
       reshaped_data_df <- as.data.frame(reshaped_data) 
@@ -242,8 +246,6 @@ server <- function(input, output, session) {
         datatable(reshaped_data_matrix, options = list(scrollX = TRUE), 
                   selection = "single")
       })
-    
-      
       
       output$heatmapPlot <- renderUI({
         generate_heatmap_plot(reshaped_data_matrix)
@@ -256,16 +258,8 @@ server <- function(input, output, session) {
     })
     return(reshaped_data)
   }
-  
-  update_outputs <- function(reshaped_data) {
-    output$dataTable <- renderDT({
-      datatable(reshaped_data, options = list(scrollX = TRUE), selection = "single")
-    })
-    output$heatmapPlot <- renderUI({
-      generate_heatmap_plot(reshaped_data)
-    })
-  }
 
+  # Management bulk single case 
   observe_data_modification <- function(reshaped_data) {
     observe({
       reshaped_data <- modify_reshaped_data(reshaped_data)
@@ -286,7 +280,7 @@ server <- function(input, output, session) {
     })
   }
   
-  # manage click on genotype table in bulk multi region and single cell
+  # Manage click on genotype table in bulk multi region and single cell
   handle_dataTable_cell_clicked <- function(reshaped_data, id_column_name) {
     observeEvent(input$dataTable_cell_clicked, {
       info <- input$dataTable_cell_clicked
@@ -301,7 +295,6 @@ server <- function(input, output, session) {
         file_to_search <- paste0(selected_id, ".txt")
         file_path <- file.path(selected_folder, file_to_search)
         
-        # Verifica se il file esiste
         if (file.exists(file_path)) {
           file_data <- read.table(file_path, header = TRUE, 
                                   stringsAsFactors = FALSE, sep = "\t")
@@ -316,7 +309,7 @@ server <- function(input, output, session) {
             for (col in input$DeleteColumn) {
               if(col %in% colnames(file_data)) {
                 col_index <- which(colnames(file_data) == col)
-                # nodo foglia
+                #nodo foglia
                 if ((1 %in% file_data[[col_index]]) && 
                     (all(as.numeric(file_data[col_index-1, -1]) == 0))) {
                   file_data[[col_index]][file_data[[col_index]] == 1] <- 0
@@ -366,9 +359,7 @@ server <- function(input, output, session) {
           
           graph <- graph_from_data_frame(edges, directed = TRUE)
           
-          
           output$graphPlot <- renderVisNetwork({
-            
             if (ecount(graph) > 0) {
               nodes <- as_tibble(get.vertex.attribute(graph))
               colnames(nodes) <- "id"
@@ -387,6 +378,8 @@ server <- function(input, output, session) {
     })
   }
   
+  # Process the present files of the selected folder in the case multiple bulk 
+  # and single cell 
   readMatrixFiles <- function(directory_path) {
     
     readMatrix <- function(filePath) {
@@ -414,6 +407,7 @@ server <- function(input, output, session) {
     return(matrix_list)
   }
  
+  # Manage bulk single case
   bulk_single_case <- function() {
     
     output$dataFile2 <- renderUI({
@@ -431,7 +425,6 @@ server <- function(input, output, session) {
       )
     })
     
-    
     output$loadBtn2 <- renderUI({
       actionButton("loadBtn2", "Load", class = "custom-button")
     })
@@ -447,6 +440,7 @@ server <- function(input, output, session) {
     observe_data_modification(reshaped_data())
   }
   
+  # Manage bulk multiple case
   bulk_multiple_case <- function() {
     modified_data <- reshaped_data()
       
@@ -466,7 +460,6 @@ server <- function(input, output, session) {
     })
     
     observe({
-      
       modified_data <- modify_reshaped_data(modified_data)
       
       output$dataTable <- renderDT({
@@ -503,6 +496,7 @@ server <- function(input, output, session) {
                    filetypes = c("", "txt"))
   }
   
+  # Manage single cell case
   single_cell_case <- function() {
     modified_data <- reshaped_data()
     
@@ -512,7 +506,6 @@ server <- function(input, output, session) {
     output$DeleteRow <- render_delete_row_ui("DeleteRow", 
                                              "Delete row", 
                                              reshaped_data())
-    
     
     handle_dataTable_cell_clicked(reshaped_data(), "ID")
     
@@ -549,10 +542,10 @@ server <- function(input, output, session) {
         )
       )
     })
-    shinyDirChoose(input, "dir", roots = c(wd = getwd()), filetypes = c("", "txt"))
-    
+    shinyDirChoose(input, "dir", roots = c(wd = getwd()), filetypes = c("", "txt")) 
   }
   
+  # Generate network graph
   generateVisNetwork <- function(nodes, edges, layout_type, title) {
     main_options <- list(text = title,
                          style = "font-family:https://fonts.googleapis.com/css2?family=Roboto+Condensed:ital,wght@0,100..900;1,100..900&display=swap;
@@ -589,8 +582,6 @@ server <- function(input, output, session) {
                         box-shadow: none; 
                         outline: none;") 
     } else {
-      
-      
       graph <- graph_from_data_frame(edges, directed = TRUE, vertices = nodes)
       layout_sugiyama <- layout_with_sugiyama(graph)
       layout_with_names <- cbind(nodes$id, layout_sugiyama$layout)
@@ -605,9 +596,7 @@ server <- function(input, output, session) {
         layer <- layout_with_names[layout_with_names[, 1] == id, 3]
         colors[as.integer(layer)]  
       })
-      
 
-      
       visNetwork(nodes, edges, main = main_options, background = "white") %>%
         visIgraphLayout(layout = "layout_with_sugiyama") %>%  
         visNodes(
@@ -641,6 +630,7 @@ server <- function(input, output, session) {
     }
   }
   
+  # Download btn CSV file
   output$downloadCSV <- downloadHandler(
     filename = function() {
       paste("inference-data-", Sys.Date(), ".csv")  
@@ -651,11 +641,12 @@ server <- function(input, output, session) {
     }
   )
   
+  # Save CSV file
   saveData <- function(data, name) {
     write.csv(data, name, row.names=TRUE)
   }
   
-  #link to external db
+  # Link to external db
   observe({
     if (!is.null(input$graph_inference_selected)&&input$graph_inference_selected!="") {
       selected_node_id <- input$graph_inference_selected
@@ -715,11 +706,10 @@ server <- function(input, output, session) {
                   "}")
               )) 
   })
-  
-  
-  
+
   ##Load
   
+  # Upload saved project information
   observeEvent(input$loadProjBtn, {
     default_values_load_genotype()
     if (is.null(input$projectList_cell_clicked$row) || 
@@ -727,7 +717,7 @@ server <- function(input, output, session) {
       showNotification("Please select an existing project", type = "error")
       
     } else {
-      #Visualise switch bottom
+      # Visualise switch bottom
       output$switchViewBtn <- renderUI({
         actionButton("switchViewBtn", "Switch View", class = "custom-button")
       })
@@ -748,7 +738,7 @@ server <- function(input, output, session) {
           project_folder <- file.path("output_project", project_name)
           project_files <- list.files(project_folder)
           
-          #Read first the file of each case
+          # Read first the file of each case
           for (file in project_files) {
             file_name <- tools::file_path_sans_ext(file)
             file_directory <- file.path(project_folder, file)
@@ -767,7 +757,7 @@ server <- function(input, output, session) {
                 parametro <- parameters[i, "name"]
                 value <- parameters[i, "value"]
                 
-                # Assegna il value all'input corrispondente
+                # Assigns the value to the corresponding input
                 if (parametro == "binarization_perc") {
                   val_bin_perc <- as.numeric(value)
                   output$binarization_perc <- renderUI({
@@ -790,7 +780,7 @@ server <- function(input, output, session) {
             }
           }
           
-          #Read the file that are for all the 3 cases
+          # Read the file that are for all the 3 cases
           for (file in project_files) {
             file_name <- tools::file_path_sans_ext(file)
             file_directory <- file.path(project_folder, file)
@@ -821,12 +811,12 @@ server <- function(input, output, session) {
             else if (file_name == "parameters") {
               parameters <- read.csv(file_directory)
 
-              # Ciclo attraverso ogni riga del dataframe
+              # Cycle through each row of the dataframe
               for (i in 1:nrow(parameters)) {
                 parametro <- parameters[i, "name"]
                 value <- parameters[i, "value"]
 
-                # Assegna il value all'input corrispondente
+                # Assigns the value to the corresponding input
                 if (parametro == "binarization") {
                   val_bin <- as.numeric(value)
                   output$binarization <- renderUI({
@@ -900,7 +890,6 @@ server <- function(input, output, session) {
           }
         }    
       })
-      
 
       updateTabItems(session, "sidebarMenu", "input")
       
@@ -936,7 +925,7 @@ server <- function(input, output, session) {
   
   # Displaying the resampling file, in the case where there are three columns 
   #(single bulk case) the table is represented.
-  # in other cases an error message is printed
+  #in other cases an error message is printed
   observeEvent(input$loadBtn2, {
     #resampling file
     inFile2 <- input$dataFile2
@@ -963,6 +952,7 @@ server <- function(input, output, session) {
   
   reshaped_data <- reactiveVal(NULL)
   
+  # Displaying the genotype file
   observeEvent(input$loadBtn, {
     inFile <- input$dataFile
     
@@ -1075,8 +1065,7 @@ server <- function(input, output, session) {
               )
             )
           })
-          
-          
+
           handle_dataTable_cell_clicked(reshaped_data(), "ID")
           
           output$directoryInput <- renderUI({
@@ -1190,11 +1179,13 @@ server <- function(input, output, session) {
 
 ############################ Inference  ########################################
   
+  # Inference btn
   observeEvent(input$submitBtn, {
     default_values_inference()
     filter <- input$binarization
     filter_perc <- input$binarization_perc
     genotype_table(reshaped_data_matrix())
+    
     # filter the genotype table according to the case
     if (is.null(case())) {
       showNotification("Upload the genomic file in the previous step", type = "error")
@@ -1239,6 +1230,7 @@ server <- function(input, output, session) {
       updateTabItems(session, "sidebarMenu", "inference")
       
       res <- NULL
+      
       #inference function
       if (!is.null(case()) && !is.na(filter)) {
         tryCatch({
@@ -1422,7 +1414,7 @@ server <- function(input, output, session) {
     }
   })
   
-  # display the inference output
+  # Display the inference output
   observe({
     req(input$sidebarMenu == "inference")
     req(input$visualize_inference)
@@ -1477,13 +1469,11 @@ server <- function(input, output, session) {
             colnames(edges) <- c("from", "to")
             
             generateVisNetwork(nodes, edges, "other", "")
-
           })
         }
       }
     }
   })
-
 
 ############################ Confidence estimation #############################
 
@@ -1531,6 +1521,7 @@ server <- function(input, output, session) {
     }
   })
   
+  # Manage save btn
   observeEvent(input$saveBtn, {
     project_name <- input$project_name
     project_name <- paste0(project_name, "_", case())
