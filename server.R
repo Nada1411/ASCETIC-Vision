@@ -18,6 +18,7 @@ server <- function(input, output, session) {
   visualizeInferenceOutput <- reactiveVal(TRUE)
   reactive_selected_result <- reactiveVal(NULL)
   reshaped_data_matrix <- reactiveVal(NULL)
+  buttonClicked <- reactiveVal(FALSE)
 
   # Active app
   observe({
@@ -82,9 +83,10 @@ server <- function(input, output, session) {
     output$dataFile2 <- NULL
     output$gene_graph_tab <- NULL
     output$graph_inference <- NULL
-    output$content <- NULL
+    output$content <- renderUI({NULL})
     output$project_info <- renderUI(NULL)
     output$heatmapPlot <- renderUI({NULL})
+    output$dataTable_cell_clicked <- renderUI({NULL})
     updateCheckboxInput(session, "resamplingFlag", value = FALSE)
     updateNumericInput(session, "nresampling", value = 3)
     updateSelectInput(session, "regularization", selected = "aic")
@@ -109,6 +111,7 @@ server <- function(input, output, session) {
     updateSelectInput(session, "DeleteRow", selected = character(0))
     updateSelectInput(session, "visualize_inference", selected = "poset")
     app_activated(FALSE)
+    buttonClicked(FALSE)
   }
   
   # Resets values when loading a genotype file
@@ -283,10 +286,11 @@ server <- function(input, output, session) {
   # Manage click on genotype table in bulk multi region and single cell
   handle_dataTable_cell_clicked <- function(reshaped_data, id_column_name) {
     observeEvent(input$dataTable_cell_clicked, {
-      info <- input$dataTable_cell_clicked
-      
-      if (!is.null(info) && !is.null(info$row) && !is.null(info$col)) {
-        row_index <- info$row
+      output$content <- renderUI({NULL})
+      info1 <- input$dataTable_cell_clicked
+
+      if (!is.null(info1) && !is.null(info1$row) && !is.null(info1$col)) {
+        row_index <- info1$row
         selected_id <- strsplit((rownames(reshaped_data)[row_index]), " ")[[1]][1]
         
         req(input$dir)
@@ -294,7 +298,6 @@ server <- function(input, output, session) {
         selected_id <- sub("\\s.*", "", selected_id)
         file_to_search <- paste0(selected_id, ".txt")
         file_path <- file.path(selected_folder, file_to_search)
-        
         if (file.exists(file_path)) {
           file_data <- read.table(file_path, header = TRUE, 
                                   stringsAsFactors = FALSE, sep = "\t")
@@ -370,10 +373,7 @@ server <- function(input, output, session) {
               generateVisNetwork(nodes, edges, "other", "")
             }
           })
-          
-        } else {
-          showNotification("Select the correct folder", type = "warning")
-        }
+        } 
       }
     })
   }
@@ -451,7 +451,6 @@ server <- function(input, output, session) {
                                              "Delete row", 
                                              reshaped_data())
 
-      
     handle_dataTable_cell_clicked(reshaped_data(), "ID")
       
     observe({
@@ -486,6 +485,7 @@ server <- function(input, output, session) {
         )
       )
     })
+    
     
     observe({
       req(input$dir)
@@ -660,6 +660,16 @@ server <- function(input, output, session) {
       })
     }
   })
+  
+  observeEvent(input$dir, {
+    output$content <- renderUI({NULL})
+  })
+  
+  observeEvent(input$tabName, {
+    if(input$tabName == "input") {
+      output$content <- renderUI({ NULL })
+    }
+  })
  
 ############################ Load or create project  ###########################
   
@@ -709,9 +719,14 @@ server <- function(input, output, session) {
 
   ##Load
   
+  
+  observeEvent(input$loadProjBtn, {
+    print("cliccato")
+    buttonClicked(TRUE) 
+  })
+  
   # Upload saved project information
   observeEvent(input$loadProjBtn, {
-    default_values_load_genotype()
     if (is.null(input$projectList_cell_clicked$row) || 
         is.null(input$projectList_cell_clicked$col)) {
       showNotification("Please select an existing project", type = "error")
@@ -724,171 +739,175 @@ server <- function(input, output, session) {
       
       # Management click on existing project table
       observeEvent(input$projectList_cell_clicked, {
-        if (!is.null(input$projectList_cell_clicked)) {
-          clicked_row <- input$projectList_cell_clicked$row
-          clicked_col <- input$projectList_cell_clicked$col
-          
-          project_name <- project_names()[clicked_row, 1]
-          
-          parti <- unlist(strsplit(project_name, "_"))
-          ultime_due_parole <- tail(parti, 2)
-          nuova_stringa <- paste(ultime_due_parole, collapse = "_")
-          case(nuova_stringa)
-          
-          project_folder <- file.path("output_project", project_name)
-          project_files <- list.files(project_folder)
-          
-          # Read first the file of each case
-          for (file in project_files) {
-            file_name <- tools::file_path_sans_ext(file)
-            file_directory <- file.path(project_folder, file)
+        if (buttonClicked()) {
+          print("controllo ok")
+          default_values_load_genotype()
+          if (!is.null(input$projectList_cell_clicked)) {
+            clicked_row <- input$projectList_cell_clicked$row
+            clicked_col <- input$projectList_cell_clicked$col
             
-            if (file_name == "resampling_table") {
-              data2 <- read.csv(file_directory)
-              output$dataTable2 <- renderDT({
-                datatable(data2, options = list(scrollX = TRUE), selection ="single")
-              })
-              reshaped_data2(data2)
-            }
-            else if (file_name == "parameters_bulk_multiple") {
-              parameters <- read.csv(file_directory)
+            project_name <- project_names()[clicked_row, 1]
+            
+            parti <- unlist(strsplit(project_name, "_"))
+            ultime_due_parole <- tail(parti, 2)
+            nuova_stringa <- paste(ultime_due_parole, collapse = "_")
+            case(nuova_stringa)
+            
+            project_folder <- file.path("output_project", project_name)
+            project_files <- list.files(project_folder)
+            
+            # Read first the file of each case
+            for (file in project_files) {
+              file_name <- tools::file_path_sans_ext(file)
+              file_directory <- file.path(project_folder, file)
               
-              for (i in 1:nrow(parameters)) {
-                parametro <- parameters[i, "name"]
-                value <- parameters[i, "value"]
+              if (file_name == "resampling_table") {
+                data2 <- read.csv(file_directory)
+                output$dataTable2 <- renderDT({
+                  datatable(data2, options = list(scrollX = TRUE), selection ="single")
+                })
+                reshaped_data2(data2)
+              }
+              else if (file_name == "parameters_bulk_multiple") {
+                parameters <- read.csv(file_directory)
                 
-                # Assigns the value to the corresponding input
-                if (parametro == "binarization_perc") {
-                  val_bin_perc <- as.numeric(value)
-                  output$binarization_perc <- renderUI({
-                    tagList(
-                      div(style = "display: flex; align-items: center;",
-                          numericInput("binarization_perc", 
-                                       label = span("Filter to binarize percentage ", 
-                                                    tags$i(id = "helpIcon4", 
-                                                           class = "fa fa-question-circle", 
-                                                           style="margin-left: 5px;")), 
-                                       value = val_bin_perc, min = 0, max = 1, step = 0.01),
-                          bsTooltip(id = "helpIcon4", 
-                                    title = "Specify the threshold you want to use as a filter to binarize the percentage of mutated regions in each sample of the database to be inputted into the next inference phase.", 
-                                    placement = "right", trigger = "hover")
-                      )
-                    )
-                  })
-                }
-              }
-            }
-          }
-          
-          # Read the file that are for all the 3 cases
-          for (file in project_files) {
-            file_name <- tools::file_path_sans_ext(file)
-            file_directory <- file.path(project_folder, file)
-            
-            if (file_name == "genotipo") {
-              data <- read.csv(file_directory, row.names = 1)
-              data <- as.matrix(data)
-              reshaped_data(data)
-              output$dataTable <- renderDT({
-                datatable(data, options = list(scrollX = TRUE), selection ="single")
-              })
-              
-              output$heatmapPlot <- renderUI({
-                generate_heatmap_plot(data)
-              })
-
-              if(case() == "bulk_single") {
-                bulk_single_case()
-              }
-              else if(case() == "bulk_multiple") {
-                bulk_multiple_case()
-              }
-              else if(case() == "single_cell") {
-                single_cell_case()
-              }
-              
-            }
-            else if (file_name == "parameters") {
-              parameters <- read.csv(file_directory)
-
-              # Cycle through each row of the dataframe
-              for (i in 1:nrow(parameters)) {
-                parametro <- parameters[i, "name"]
-                value <- parameters[i, "value"]
-
-                # Assigns the value to the corresponding input
-                if (parametro == "binarization") {
-                  val_bin <- as.numeric(value)
-                  output$binarization <- renderUI({
-                    tagList(
-                      div(style = "display: flex; align-items: center;",
-                          numericInput("binarization", 
-                                       label = span("Filter to binarize ", 
-                                                    tags$i(id = "helpIcon3", 
-                                                           class = "fa fa-question-circle", 
-                                                           style="margin-left: 5px;")), 
-                                       value = val_bin, min = 0, max = 1, 
-                                       step = 0.01),
-                          bsTooltip(id = "helpIcon3", 
-                                    title = "Specify which threshold you want to use as a filter to binarize the database to be inputted into the next inference phase.", 
-                                    placement = "right", trigger = "hover")
-                      )
-                    )
-                  })
-                }
-                else if (parametro =="del_col") {
-                  vettore <- unlist(strsplit(gsub("\"", "", value), ",\\s*"))
-                  del_col <- vettore[vettore != ""]
-                  output$DeleteColumn <- render_delete_column_ui("DeleteColumn", 
-                                                                 "Delete column", 
-                                                                 reshaped_data(),
-                                                                 selected_columns = del_col)
+                for (i in 1:nrow(parameters)) {
+                  parametro <- parameters[i, "name"]
+                  value <- parameters[i, "value"]
                   
-                }else if (parametro =="del_row") {
-                  vettore <- unlist(strsplit(gsub("\"", "", value), ",\\s*"))
-                  del_row <- vettore[vettore != ""]
-                  output$DeleteRow <- render_delete_row_ui("DeleteRow", 
-                                                           "Delete row", 
-                                                           reshaped_data(),
-                                                           selected_rows = del_row)
-                }else if (parametro == "flag_resampling") {
-                  updateCheckboxInput(session, "resamplingFlag", 
-                                      value = as.logical(value))
-                } else if (parametro == "nresampling") {
-                  nresampling(as.numeric(value))
-                  updateNumericInput(session, "nresampling", 
-                                     value = as.numeric(value))
-                } else if (parametro == "restarts") {
-                  updateNumericInput(session, "restarts", 
-                                     value = as.numeric(value))
-                } else if (parametro == "regularization") {
-                  elements <- unlist(strsplit(value, ", "))
-                  updateSelectInput(session, "regularization", 
-                                    selected = c(elements))
-                } else if (parametro == "command") {
-                  updateSelectInput(session, "command", selected = value)
-                } else if (parametro == "seed") {
-                  val_seed <- as.numeric(value)
-                  updateNumericInput(session, "seed", value = val_seed)
+                  # Assigns the value to the corresponding input
+                  if (parametro == "binarization_perc") {
+                    val_bin_perc <- as.numeric(value)
+                    output$binarization_perc <- renderUI({
+                      tagList(
+                        div(style = "display: flex; align-items: center;",
+                            numericInput("binarization_perc", 
+                                         label = span("Filter to binarize percentage ", 
+                                                      tags$i(id = "helpIcon4", 
+                                                             class = "fa fa-question-circle", 
+                                                             style="margin-left: 5px;")), 
+                                         value = val_bin_perc, min = 0, max = 1, step = 0.01),
+                            bsTooltip(id = "helpIcon4", 
+                                      title = "Specify the threshold you want to use as a filter to binarize the percentage of mutated regions in each sample of the database to be inputted into the next inference phase.", 
+                                      placement = "right", trigger = "hover")
+                        )
+                      )
+                    })
+                  }
                 }
               }
             }
-            else if (file_name == "resampling_res") {
-              resampling_res(readRDS(file_directory))
-              res <- resampling_res()
-              names_to_remove <- c("dataset", "models", "ccfDataset", "inference")
-              names <- setdiff(names(res), names_to_remove)
-              names <- c(names, names(res$inference))
-              visualizeInferenceOutput(TRUE)
-              output$visualize_inference <- renderUI({
-                selectInput("visualize_inference", 
-                            "Output inference", 
-                            c(names),
-                            selected = "poset")  
-              })
+            
+            # Read the file that are for all the 3 cases
+            for (file in project_files) {
+              file_name <- tools::file_path_sans_ext(file)
+              file_directory <- file.path(project_folder, file)
+              
+              if (file_name == "genotipo") {
+                data <- read.csv(file_directory, row.names = 1)
+                data <- as.matrix(data)
+                reshaped_data(data)
+                output$dataTable <- renderDT({
+                  datatable(data, options = list(scrollX = TRUE), selection ="single")
+                })
+                
+                output$heatmapPlot <- renderUI({
+                  generate_heatmap_plot(data)
+                })
+  
+                if(case() == "bulk_single") {
+                  bulk_single_case()
+                }
+                else if(case() == "bulk_multiple") {
+                  bulk_multiple_case()
+                }
+                else if(case() == "single_cell") {
+                  single_cell_case()
+                }
+                
+              }
+              else if (file_name == "parameters") {
+                parameters <- read.csv(file_directory)
+  
+                # Cycle through each row of the dataframe
+                for (i in 1:nrow(parameters)) {
+                  parametro <- parameters[i, "name"]
+                  value <- parameters[i, "value"]
+  
+                  # Assigns the value to the corresponding input
+                  if (parametro == "binarization") {
+                    val_bin <- as.numeric(value)
+                    output$binarization <- renderUI({
+                      tagList(
+                        div(style = "display: flex; align-items: center;",
+                            numericInput("binarization", 
+                                         label = span("Filter to binarize ", 
+                                                      tags$i(id = "helpIcon3", 
+                                                             class = "fa fa-question-circle", 
+                                                             style="margin-left: 5px;")), 
+                                         value = val_bin, min = 0, max = 1, 
+                                         step = 0.01),
+                            bsTooltip(id = "helpIcon3", 
+                                      title = "Specify which threshold you want to use as a filter to binarize the database to be inputted into the next inference phase.", 
+                                      placement = "right", trigger = "hover")
+                        )
+                      )
+                    })
+                  }
+                  else if (parametro =="del_col") {
+                    vettore <- unlist(strsplit(gsub("\"", "", value), ",\\s*"))
+                    del_col <- vettore[vettore != ""]
+                    output$DeleteColumn <- render_delete_column_ui("DeleteColumn", 
+                                                                   "Delete column", 
+                                                                   reshaped_data(),
+                                                                   selected_columns = del_col)
+                    
+                  }else if (parametro =="del_row") {
+                    vettore <- unlist(strsplit(gsub("\"", "", value), ",\\s*"))
+                    del_row <- vettore[vettore != ""]
+                    output$DeleteRow <- render_delete_row_ui("DeleteRow", 
+                                                             "Delete row", 
+                                                             reshaped_data(),
+                                                             selected_rows = del_row)
+                  }else if (parametro == "flag_resampling") {
+                    updateCheckboxInput(session, "resamplingFlag", 
+                                        value = as.logical(value))
+                  } else if (parametro == "nresampling") {
+                    nresampling(as.numeric(value))
+                    updateNumericInput(session, "nresampling", 
+                                       value = as.numeric(value))
+                  } else if (parametro == "restarts") {
+                    updateNumericInput(session, "restarts", 
+                                       value = as.numeric(value))
+                  } else if (parametro == "regularization") {
+                    elements <- unlist(strsplit(value, ", "))
+                    updateSelectInput(session, "regularization", 
+                                      selected = c(elements))
+                  } else if (parametro == "command") {
+                    updateSelectInput(session, "command", selected = value)
+                  } else if (parametro == "seed") {
+                    val_seed <- as.numeric(value)
+                    updateNumericInput(session, "seed", value = val_seed)
+                  }
+                }
+              }
+              else if (file_name == "resampling_res") {
+                resampling_res(readRDS(file_directory))
+                res <- resampling_res()
+                names_to_remove <- c("dataset", "models", "ccfDataset", "inference")
+                names <- setdiff(names(res), names_to_remove)
+                names <- c(names, names(res$inference))
+                visualizeInferenceOutput(TRUE)
+                output$visualize_inference <- renderUI({
+                  selectInput("visualize_inference", 
+                              "Output inference", 
+                              c(names),
+                              selected = "poset")  
+                })
+              }
             }
           }
-        }    
+        }
       })
 
       updateTabItems(session, "sidebarMenu", "input")
