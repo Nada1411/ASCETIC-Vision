@@ -11,12 +11,15 @@ server <- function(input, output, session) {
   genotype_table <- reactiveVal(NULL)
   case <- reactiveVal(NULL)
   resampling_res <- reactiveVal(NULL)
+  conf_res <- reactiveVal(NULL)
   reshaped_data2 <- reactiveVal(NULL)
   rv <- reactiveValues(deletedColumns = character(0), deletedRows = character(0))
   app_activated <- reactiveVal(FALSE)
   nresampling <- reactiveVal(FALSE)
   visualizeInferenceOutput <- reactiveVal(TRUE)
+  visualizeConfidenceOutput <- reactiveVal(TRUE)
   reactive_selected_result <- reactiveVal(NULL)
+  reactive_selected_result_conf <- reactiveVal(NULL)
   reshaped_data_matrix <- reactiveVal(NULL)
   buttonClicked <- reactiveVal(FALSE)
 
@@ -97,7 +100,9 @@ server <- function(input, output, session) {
     reshaped_data2(NULL)
     nresampling(NULL)
     visualizeInferenceOutput(FALSE)
+    visualizeConfidenceOutput(FALSE)
     resampling_res(NULL)
+    conf_res(NULL)
     case(NULL)
     selected_folder(NULL)
   }
@@ -106,6 +111,7 @@ server <- function(input, output, session) {
   default_values_load_genotype <- function() {
     reset_common_values()
     output$selected_result_output <- renderDataTable(NULL)
+    output$selected_result_output_conf <- renderDataTable(NULL)
     output$visualize_inference <- renderUI(NULL)
     updateSelectInput(session, "DeleteColumn", selected = character(0))
     updateSelectInput(session, "DeleteRow", selected = character(0))
@@ -119,6 +125,7 @@ server <- function(input, output, session) {
     reset_common_values()
     output$visualize_inference <- NULL
     output$selected_result_output <- NULL
+    output$selected_result_output_conf <- NULL
     updateSelectInput(session, "DeleteColumn", selected = character(0))
     updateSelectInput(session, "DeleteRow", selected = character(0))
   }
@@ -128,6 +135,7 @@ server <- function(input, output, session) {
     reset_common_values()
     output$switchViewBtn <- renderUI(NULL)
     output$selected_result_output <- NULL
+    output$selected_result_output_conf <- NULL
     orig <- reactiveVal(NULL)
     output$DeleteColumn <- NULL
     output$DeleteRow <- NULL
@@ -138,9 +146,12 @@ server <- function(input, output, session) {
   # Resets values when submit btm in inference
   default_values_inference <- function() {
     output$graph_inference <- NULL
+    output$graph_conf <- NULL
+    output$selected_result_output_conf <- renderDataTable(NULL)
     output$selected_result_output <- renderDataTable(NULL)
     output$visualize_inference <- renderUI(NULL)
     visualizeInferenceOutput(FALSE)
+    visualizeConfidenceOutput(FALSE)
   }
   
   # Returns the list of project names in the output_project folder
@@ -641,6 +652,17 @@ server <- function(input, output, session) {
     }
   )
   
+  # Download btn CSV file confidence
+  output$downloadCSV_conf <- downloadHandler(
+    filename = function() {
+      paste("confidence-data-", Sys.Date(), ".csv")  
+    },
+    content = function(file) {
+      res <- reactive_selected_result_conf()
+      write.csv(res, file, row.names = TRUE, col.names = TRUE)
+    }
+  )
+  
   # Save CSV file
   saveData <- function(data, name) {
     write.csv(data, name, row.names=TRUE)
@@ -721,7 +743,6 @@ server <- function(input, output, session) {
   
   
   observeEvent(input$loadProjBtn, {
-    print("cliccato")
     buttonClicked(TRUE) 
   })
   
@@ -740,7 +761,6 @@ server <- function(input, output, session) {
       # Management click on existing project table
       observeEvent(input$projectList_cell_clicked, {
         if (buttonClicked()) {
-          print("controllo ok")
           default_values_load_genotype()
           if (!is.null(input$projectList_cell_clicked)) {
             clicked_row <- input$projectList_cell_clicked$row
@@ -1497,38 +1517,114 @@ server <- function(input, output, session) {
 ############################ Confidence estimation #############################
 
   # Callback function to handle click on input resamplingFlag
-  observeEvent(input$resamplingFlag_confEstimation, {
-    # Check whether the resampling flag has been activated.
-    if (input$resamplingFlag_confEstimation) {
-      # Check if case is not null and if it's bulk_single, whether the file is loaded
-      if (!is.null(case()) && (case() != "bulk_single" || 
-                               !is.null(input$dataTable2) || 
-                               !is.null(reshaped_data2()))) {
-        ## da sistemare quando gestirò le sessioni anche per questa fase
-        #if (!is.null(nresampling())) {
-        #  output$nresampling_confEstimation <- renderUI({
-        #    numericInput("nresampling", "Number of samplings", nresampling(), min = 3)
-        #  })
-        #} else {
-        output$nresampling_confEstimation <- renderUI({
-          numericInput("nresampling", "Number of samplings", 3, min = 3)
-        })
-        #}
-      } else {
-        # If the condition is not met, show a warning
-        showNotification("Load the resampling file in the previous step", type = "warning")
-        # Update resamplingFlag back to FALSE
-        updateCheckboxInput(session, "resamplingFlag_confEstimation", value = FALSE)
-      }
+  observeEvent(input$submitBtn_confEstimation, {
+    if (is.null(resampling_res())) {
+      showNotification("Perform the inference phase first", type = "message")
     } else {
-      # If resamplingFlag is off, remove the nresampling input
-      output$nresampling_confEstimation <- NULL
+      tryCatch({
+        if(case()=="bulk_single") {
+          res <- asceticCCFAssessment(
+            inference = resampling_res(),
+            niterations = input$iteration_confEstimation,
+            vafDataset = reshaped_data2(),
+            nsampling = input$nresampling_confEstimation,
+          )
+        }
+        else{
+          res <- asceticPhylogeniesAssessment(
+            inference = resampling_res(),
+            niterations = input$iteration_confEstimation,
+            nsampling = input$nresampling_confEstimation
+          )
+        }
+        print(res)
+        conf_res(res)
+        
+        if(!is.null(res)) {
+          
+          names_to_remove <- c("dataset", "models", "ccfDataset", "inference")
+          names <- setdiff(names(res), names_to_remove)
+          names <- c(names, names(res$inference))
+          visualizeConfidenceOutput(TRUE)
+          output$visualize_conf <- renderUI({selectInput("visualize_conf", 
+                                                         "Output confidence", 
+                                                         c(names),
+                                                         selected = "poset")})
+        }
+      }, error = function(e) {
+        visualizeConfidenceOutput(FALSE)
+        output$visualize_conf <- NULL
+        output$selected_result_output_conf <- NULL
+        output$graph_conf <- NULL
+        showNotification("Select the correct folder in the previous step", type = "error")
+      })
     }
   })
   
-  observeEvent(input$submitBtn_confEstimation_deactivated, {
-    showNotification("Perform the inference phase first", type = "message")
+  # Display the confidence estimation  output
+  observe({
+    req(input$sidebarMenu == "confidence_estimation")
+    req(input$visualize_conf)
+    res <- conf_res()
+    output$selected_result_output_conf <- NULL
+    col_names <- colnames(res$dataset)
+    
+    if(visualizeConfidenceOutput()) {
+      if (input$visualize_conf %in% names(res)) {
+        selected_result <- res[[input$visualize_conf]]
+      } else {
+        selected_result <- res$inference[[input$visualize_conf]]
+      }
+      
+      if (input$visualize_conf == "ranking") {
+        ranking_df <- as.data.frame(selected_result)
+        ranking_df <- data.frame(genes = rownames(ranking_df), rank = ranking_df$selected_result)
+
+        reactive_selected_result_conf (ranking_df)
+        output$selected_result_output_conf <- renderDT({
+          datatable(
+            reactive_selected_result_conf(),
+            options = list(
+              scrollX = TRUE,
+              columnDefs = list(list(targets = 1, className = 'dt-body-left'))  
+            ),
+            rownames = FALSE,
+            selection = "single"
+          )
+        })
+        
+      } else if (input$visualize_conf == "poset"){
+        output$graph_conf <- NULL
+        reactive_selected_result_conf (selected_result)
+        output$selected_result_output_conf <- renderDT({
+          datatable(reactive_selected_result_conf(), options = list(scrollX = TRUE), rownames = TRUE, selection = "single")
+        })
+      } else {
+
+        if (all(selected_result == 0)) {
+          showNotification("No DAG available", type = "message")
+          output$graph_conf <- NULL
+        } else {
+          reactive_selected_result_conf(selected_result)
+          grafo <- graph_from_adjacency_matrix(selected_result)
+          
+          output$graph_conf <- renderVisNetwork({
+            nodi_da_rimuovere <- V(grafo)[degree(grafo, mode = "in") == 0 & 
+                                            degree(grafo, mode = "out") == 0]
+            grafo <- delete.vertices(grafo, nodi_da_rimuovere)
+            nodes <- as_tibble(get.vertex.attribute(grafo))
+            colnames(nodes) <- "id"
+            nodes <- data.frame(nodes, label= nodes$id)
+            edges <- as_tibble(as_edgelist(grafo))
+            colnames(edges) <- c("from", "to")
+            
+            generateVisNetwork(nodes, edges, "other", "")
+          })
+        }
+      }
+    }
   })
+
   
 ############################ Save project  ################################# 
   

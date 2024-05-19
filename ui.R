@@ -212,38 +212,63 @@ shinyUI(
             fluidRow(
               column(6,
                      style = "margin-top: -10px; margin-bottom: 30px;",
-                     selectInput("regularization_confEstimation", "Regularization", 
-                                 c("aic", "bic", "loglik", "ebic", 
-                                   "bde", "bds", "mbde", 
-                                   "bdla", "k2", "fnml", "qnml", "nal", 
-                                   "pnal"), 
-                                 multiple = TRUE, selected = "aic"),
-                     selectInput("command_confEstimation", "Command", c("hc","tabu")),
-                     numericInput("restarts_confEstimation", "Restarts", 10, min = 0),
-                     numericInput("iteration_confEstimation", "Iteration", 10, min = 0),
+                     numericInput("iteration_confEstimation", "Iteration", 1, min = 0),
               ),
               column(6, 
-                     tags$div(
-                       numericInput("seed_confEstimation", "Seed", 12345, min = 0),
-                       style = "margin-top: -10px;"
-                     ),
-                     tags$div(
-                       checkboxInput("resamplingFlag_confEstimation", 
-                                     HTML("<strong>Resampling</strong>")),
-                       style = "margin-top: 45px;", width = "500px"
-                     ),
-                     uiOutput("nresampling_confEstimation", style = "margin-top: 25px;")
+                     style = "margin-top: -10px; margin-bottom: 30px;",
+                     numericInput("nresampling_confEstimation", "Number of samplings", 1, min = 3)
+              ),
+              column(12, align = "left",
+                     actionButton("submitBtn_confEstimation", "Invia", class = "custom-button")
               ),
             ),
-            conditionalPanel(
-              condition = "output.visualize_inference != null",
-              actionButton("submitBtn_confEstimation", "Invia", class = "custom-button"),
+            fluidPage(
+              style = "margin-left: -15px; ",
+              fluidRow(
+                column(6,
+                       style = "margin-top: 50px;",
+                       uiOutput("visualize_conf", class = "custom-width"),
+                       conditionalPanel(
+                         class = "no-border-bg",
+                         condition = "output.graph_conf != null",
+                         sliderInput("fontSize", "Font size", min = 5, 
+                                     max = 40, value = 12)
+                       ),
+                       uiOutput("gene_graph_tab_conf", style = "margin-top: 50px;"),
+                ),
+                column(6, 
+                       conditionalPanel(
+                         class = "no-border-bg",
+                         condition = "output.visualize_conf != null",
+                         downloadButton("downloadCSV_conf", "Download Data as CSV", 
+                                        class = "custom-width1"),
+                       ),
+                       conditionalPanel(
+                         class = "no-border-bg",
+                         condition = "output.graph_conf != null",
+                         sliderInput("nodeSize", "Node size", min = 5,
+                                     max = 30, value = 10)
+                       ),
+                ),
+              ),
             ),
+            
+            tags$div(style = "height: 40px;"),
             conditionalPanel(
-              condition = "output.visualize_inference == null",
-              bsButton("submitBtn_confEstimation_deactivated", "Invia"),
+              condition = "output.graph_conf",
+              tags$div("Conf. output", style = "font-weight: bold; 
+                       margin-top: 30px; font-size: 17px; margin-bottom: 20px; 
+                       text-align: center;"),
+            ),
+            div(
+              visNetworkOutput("graph_conf", width = "80%", height = "500px")
             ),
             style = "margin-top: 30px;",
+            div(
+              style = "display: flex; justify-content: center; margin-top: -480px;",
+              DTOutput("selected_result_output_conf")
+            ),
+            style = "margin-bottom: 500px;",
           )
         ),
         tabItem(
