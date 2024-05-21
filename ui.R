@@ -211,13 +211,18 @@ shinyUI(
             style = "margin-left: 10px; margin-right: 10px;",
             fluidRow(
               column(6,
-                     style = "margin-top: -10px; margin-bottom: 30px;",
-                     numericInput("iteration_confEstimation", "Iteration", 1, min = 0),
+                     style = "margin-top: -25px; margin-bottom: 30px;",
+                     tags$div(
+                       checkboxInput("resamplingFlag_conf", 
+                                     HTML("<strong>Resampling</strong>")),
+                       style = "margin-top: 45px;", width = "500px"
+                     ),
+                     uiOutput("nresampling_conf", style = "margin-top: 25px;")
               ),
               column(6, 
                      style = "margin-top: -10px; margin-bottom: 30px;",
-                     numericInput("nresampling_confEstimation", "Number of samplings", 1, min = 3)
-              ),
+                     numericInput("iteration_confEstimation", "Iteration", 1, min = 0),
+                     ),
               column(12, align = "left",
                      actionButton("submitBtn_confEstimation", "Invia", class = "custom-button")
               ),
@@ -256,11 +261,12 @@ shinyUI(
             tags$div(style = "height: 40px;"),
             conditionalPanel(
               condition = "output.graph_conf",
-              tags$div("Conf. output", style = "font-weight: bold; 
+              tags$div("Confidence output", style = "font-weight: bold; 
                        margin-top: 30px; font-size: 17px; margin-bottom: 20px; 
                        text-align: center;"),
             ),
             div(
+              style = "display: flex; justify-content: center;",
               visNetworkOutput("graph_conf", width = "80%", height = "500px")
             ),
             style = "margin-top: 30px;",

@@ -2,8 +2,8 @@ source("libraries.R")
 
 server <- function(input, output, session) {
   
-############################ Variables  ######################################
-
+  ############################ Variables  ######################################
+  
   selected_folder <- reactiveVal(NULL)
   directory_output <- reactiveVal(NULL)
   reshaped_data <- reactiveVal(NULL)
@@ -16,13 +16,14 @@ server <- function(input, output, session) {
   rv <- reactiveValues(deletedColumns = character(0), deletedRows = character(0))
   app_activated <- reactiveVal(FALSE)
   nresampling <- reactiveVal(FALSE)
+  nresampling_conf <- reactiveVal(FALSE)
   visualizeInferenceOutput <- reactiveVal(TRUE)
   visualizeConfidenceOutput <- reactiveVal(TRUE)
   reactive_selected_result <- reactiveVal(NULL)
   reactive_selected_result_conf <- reactiveVal(NULL)
   reshaped_data_matrix <- reactiveVal(NULL)
   buttonClicked <- reactiveVal(FALSE)
-
+  
   # Active app
   observe({
     if (!app_activated()) {
@@ -47,7 +48,7 @@ server <- function(input, output, session) {
       )
     }
   })
-
+  
   # Regularization selectable in the confidence enstimation step are those that 
   # were used during the inference step
   observe({
@@ -74,8 +75,8 @@ server <- function(input, output, session) {
   })
   
   
-############################ Function  #######################################
-
+  ############################ Function  #######################################
+  
   reset_common_values <- function() {
     output$directoryInput <- renderUI(NULL)
     output$binarization_perc <- renderUI(NULL)
@@ -86,12 +87,16 @@ server <- function(input, output, session) {
     output$dataFile2 <- NULL
     output$gene_graph_tab <- NULL
     output$graph_inference <- NULL
+    output$graph_conf <- NULL
     output$content <- renderUI({NULL})
     output$project_info <- renderUI(NULL)
     output$heatmapPlot <- renderUI({NULL})
     output$dataTable_cell_clicked <- renderUI({NULL})
     updateCheckboxInput(session, "resamplingFlag", value = FALSE)
+    updateCheckboxInput(session, "resamplingFlag_conf", value = FALSE)
     updateNumericInput(session, "nresampling", value = 3)
+    updateNumericInput(session, "iteration_confEstimation", value = 1)
+    updateNumericInput(session, "nresampling_conf", value = 3)
     updateSelectInput(session, "regularization", selected = "aic")
     updateSelectInput(session, "command", selected = "hc")
     updateNumericInput(session, "restarts", value = 10)
@@ -99,6 +104,7 @@ server <- function(input, output, session) {
     rv <- reactiveValues(deletedColumns = character(0), deletedRows = character(0))
     reshaped_data2(NULL)
     nresampling(NULL)
+    nresampling_conf(NULL)
     visualizeInferenceOutput(FALSE)
     visualizeConfidenceOutput(FALSE)
     resampling_res(NULL)
@@ -113,6 +119,7 @@ server <- function(input, output, session) {
     output$selected_result_output <- renderDataTable(NULL)
     output$selected_result_output_conf <- renderDataTable(NULL)
     output$visualize_inference <- renderUI(NULL)
+    output$visualize_conf <- NULL
     updateSelectInput(session, "DeleteColumn", selected = character(0))
     updateSelectInput(session, "DeleteRow", selected = character(0))
     updateSelectInput(session, "visualize_inference", selected = "poset")
@@ -126,6 +133,7 @@ server <- function(input, output, session) {
     output$visualize_inference <- NULL
     output$selected_result_output <- NULL
     output$selected_result_output_conf <- NULL
+    output$visualize_conf <- NULL
     updateSelectInput(session, "DeleteColumn", selected = character(0))
     updateSelectInput(session, "DeleteRow", selected = character(0))
   }
@@ -140,6 +148,7 @@ server <- function(input, output, session) {
     output$DeleteColumn <- NULL
     output$DeleteRow <- NULL
     output$visualize_inference <- NULL
+    output$visualize_conf <- NULL
     app_activated(FALSE)
   }
   
@@ -160,7 +169,7 @@ server <- function(input, output, session) {
     file_infos <- file.info(file.path("output_project", project_names))
     last_modified <- file_infos$mtime
     project_info <- data.frame(project_names, last_modified)
-  
+    
     return(project_info)
   }
   
@@ -191,7 +200,7 @@ server <- function(input, output, session) {
     observeEvent(input$dataTable_cell_clicked, {
       if (case()=="bulk_single") {
         info <- input$dataTable_cell_clicked
-  
+        
         if (!is.null(info)) {
           row_index <- info$row
           selected_genes <- names(which(reshaped_data[row_index, ] != 0))
@@ -206,7 +215,7 @@ server <- function(input, output, session) {
             
             poset_graph <- make_graph(edges = sorted_genes, directed = TRUE)
           }
-
+          
           output$posetGraph <- renderVisNetwork({
             
             nodes <- as_tibble(get.vertex.attribute(poset_graph))
@@ -214,10 +223,10 @@ server <- function(input, output, session) {
             nodes <- data.frame(nodes, label= nodes$id)
             edges <- as_tibble(as_edgelist(poset_graph))
             colnames(edges) <- c("from", "to")
-
+            
             generateVisNetwork(nodes, edges, "poset", "Poset")
           })
-  
+          
           output$content <- renderUI({
             if (!is.null(poset_graph) && length(poset_graph) > 0) {
               tagList(
@@ -233,7 +242,7 @@ server <- function(input, output, session) {
       }
     })
   }
-
+  
   # Selection/deletion of row and column
   modify_reshaped_data <- function(reshaped_data) {
     observe({
@@ -272,7 +281,7 @@ server <- function(input, output, session) {
     })
     return(reshaped_data)
   }
-
+  
   # Management bulk single case 
   observe_data_modification <- function(reshaped_data) {
     observe({
@@ -289,7 +298,7 @@ server <- function(input, output, session) {
       })
       
       observe_table_cell_clicked(reshaped_data)
-
+      
       reshaped_data(reshaped_data)
     })
   }
@@ -299,7 +308,7 @@ server <- function(input, output, session) {
     observeEvent(input$dataTable_cell_clicked, {
       output$content <- renderUI({NULL})
       info1 <- input$dataTable_cell_clicked
-
+      
       if (!is.null(info1) && !is.null(info1$row) && !is.null(info1$col)) {
         row_index <- info1$row
         selected_id <- strsplit((rownames(reshaped_data)[row_index]), " ")[[1]][1]
@@ -417,7 +426,7 @@ server <- function(input, output, session) {
     }
     return(matrix_list)
   }
- 
+  
   # Manage bulk single case
   bulk_single_case <- function() {
     
@@ -454,16 +463,16 @@ server <- function(input, output, session) {
   # Manage bulk multiple case
   bulk_multiple_case <- function() {
     modified_data <- reshaped_data()
-      
+    
     output$DeleteColumn <- render_delete_column_ui("DeleteColumn", 
                                                    "Delete column", 
                                                    reshaped_data())
     output$DeleteRow <- render_delete_row_ui("DeleteRow", 
                                              "Delete row", 
                                              reshaped_data())
-
+    
     handle_dataTable_cell_clicked(reshaped_data(), "ID")
-      
+    
     observe({
       req(input$dir)
       selected_folder(parseDirPath(c(wd = getwd()), input$dir))
@@ -601,13 +610,13 @@ server <- function(input, output, session) {
       unique_numbers_count <- length(unique(layout_with_names[, 3]))
       list_of_node_lists <- split(layout_with_names[, 1], layout_with_names[, 3])
       colors <- brewer.pal(unique_numbers_count, "OrRd")
-
+      
       
       nodes$color <- sapply(nodes$id, function(id) {
         layer <- layout_with_names[layout_with_names[, 1] == id, 3]
         colors[as.integer(layer)]  
       })
-
+      
       visNetwork(nodes, edges, main = main_options, background = "white") %>%
         visIgraphLayout(layout = "layout_with_sugiyama") %>%  
         visNodes(
@@ -683,6 +692,21 @@ server <- function(input, output, session) {
     }
   })
   
+  # Link to external db confidence
+  observe({
+    if (!is.null(input$graph_conf_selected)&&input$graph_conf_selected!="") {
+      selected_node_id <- input$graph_conf_selected
+      edb <- EnsDb.Hsapiens.v86
+      Tx <- transcripts(edb, filter = GeneNameFilter(selected_node_id))
+      tx_ids <- Tx[1,1]
+      row_id <- names(tx_ids)
+      link <- paste0("https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=", row_id)
+      output$gene_graph_tab_conf <- renderUI({
+        a("Gene info", href=link, id='geneInfoLink')
+      })
+    }
+  })
+  
   observeEvent(input$dir, {
     output$content <- renderUI({NULL})
   })
@@ -692,8 +716,8 @@ server <- function(input, output, session) {
       output$content <- renderUI({ NULL })
     }
   })
- 
-############################ Load or create project  ###########################
+  
+  ############################ Load or create project  ###########################
   
   ##Create
   
@@ -703,7 +727,7 @@ server <- function(input, output, session) {
     default_values_create_project()
     updateTabItems(session, "sidebarMenu", "input")
   })
-
+  
   # Show project names in "output_project" folder
   project_names <- reactive({
     get_project_names()
@@ -727,7 +751,7 @@ server <- function(input, output, session) {
                                  format = "%Y-%m-%d %H:%M:%S")
       
     }
-
+    
     datatable(project_data, rownames = FALSE, 
               colnames = c("Project name", "Data type", "Last modified"), 
               selection ="single", options = list(
@@ -738,7 +762,7 @@ server <- function(input, output, session) {
                   "}")
               )) 
   })
-
+  
   ##Load
   
   
@@ -834,7 +858,7 @@ server <- function(input, output, session) {
                 output$heatmapPlot <- renderUI({
                   generate_heatmap_plot(data)
                 })
-  
+                
                 if(case() == "bulk_single") {
                   bulk_single_case()
                 }
@@ -848,12 +872,12 @@ server <- function(input, output, session) {
               }
               else if (file_name == "parameters") {
                 parameters <- read.csv(file_directory)
-  
+                
                 # Cycle through each row of the dataframe
                 for (i in 1:nrow(parameters)) {
                   parametro <- parameters[i, "name"]
                   value <- parameters[i, "value"]
-  
+                  
                   # Assigns the value to the corresponding input
                   if (parametro == "binarization") {
                     val_bin <- as.numeric(value)
@@ -908,6 +932,16 @@ server <- function(input, output, session) {
                   } else if (parametro == "seed") {
                     val_seed <- as.numeric(value)
                     updateNumericInput(session, "seed", value = val_seed)
+                  } else if(parametro == "iteration") {
+                    val_it <- as.numeric(value)
+                    updateNumericInput(session, "iteration_confEstimation", value = val_it)
+                  } else if (parametro == "flag_confidence") {
+                    updateCheckboxInput(session, "resamplingFlag_conf", 
+                                        value = as.logical(value))
+                  } else if (parametro == "nresampling_confidence") {
+                    nresampling_conf(as.numeric(value))
+                    updateNumericInput(session, "nresampling_conf", 
+                                       value = as.numeric(value))
                   }
                 }
               }
@@ -924,12 +958,25 @@ server <- function(input, output, session) {
                               c(names),
                               selected = "poset")  
                 })
+              }else if (file_name == "confidence_res") {
+                conf_res(readRDS(file_directory))
+                res <- conf_res()
+                names_to_remove <- c("dataset", "models", "ccfDataset", "inference")
+                names <- setdiff(names(res), names_to_remove)
+                names <- c(names, names(res$inference))
+                visualizeConfidenceOutput(TRUE)
+                output$visualize_conf <- renderUI({
+                  selectInput("visualize_conf", 
+                              "Output Confidence", 
+                              c(names),
+                              selected = "poset")  
+                })
               }
             }
           }
         }
       })
-
+      
       updateTabItems(session, "sidebarMenu", "input")
       
       selected_row <- input$projectList_rows_selected
@@ -941,7 +988,7 @@ server <- function(input, output, session) {
       })
     }
   })
-
+  
   # Function to render UI for deleting columns
   render_delete_column_ui <- function(input_id, label, data, selected_columns = NULL) {
     output <- renderUI({
@@ -953,14 +1000,14 @@ server <- function(input, output, session) {
   
   # Function to render UI for deleting rows
   render_delete_row_ui <- function(input_id, label, data, selected_rows = NULL) {
-      output <- renderUI({
-        selectInput(input_id, label, choices = rownames(data), 
-                    selected = selected_rows, multiple = TRUE)
-      })
-      return(output)
+    output <- renderUI({
+      selectInput(input_id, label, choices = rownames(data), 
+                  selected = selected_rows, multiple = TRUE)
+    })
+    return(output)
   }
   
-############################ Input data  #######################################
+  ############################ Input data  #######################################
   
   # Displaying the resampling file, in the case where there are three columns 
   #(single bulk case) the table is represented.
@@ -1009,7 +1056,7 @@ server <- function(input, output, session) {
         reshaped_data(
           acast(data, SAMPLE ~ GENE, value.var = "CCF", fill = 0)
         )
-
+        
         output$binarization <- renderUI({
           tagList(
             div(style = "display: flex; align-items: center;",
@@ -1034,7 +1081,7 @@ server <- function(input, output, session) {
       } else if (ncol(data) == 4) {   #### Bulk multipla biopsia o single cell 
         if (colnames(data)[2]=="REGION") {
           default_values_load_new_genotype()
-
+          
           case("bulk_multiple")
           # Remove duplicates by keeping only the first occurrence for each position
           data <- distinct(data, SAMPLE, REGION, GENE, .keep_all = TRUE)
@@ -1056,7 +1103,7 @@ server <- function(input, output, session) {
           output$DeleteRow <- render_delete_row_ui("DeleteRow", 
                                                    "Delete row", 
                                                    reshaped_data())
-        
+          
           observe({
             modified_data <- modify_reshaped_data(modified_data)
             output$dataTable <- renderDT({
@@ -1104,7 +1151,7 @@ server <- function(input, output, session) {
               )
             )
           })
-
+          
           handle_dataTable_cell_clicked(reshaped_data(), "ID")
           
           output$directoryInput <- renderUI({
@@ -1135,14 +1182,14 @@ server <- function(input, output, session) {
           data <- distinct(data, PATIENT, CELL, GENE, .keep_all = TRUE)
           
           data <- data %>%
-              group_by(PATIENT, GENE) %>%
-              summarise(PERCENTAGE = mean(VALUE)) %>%
-              pivot_wider(names_from = GENE, values_from = PERCENTAGE, 
-                          values_fill = list(PERCENTAGE = 0))
+            group_by(PATIENT, GENE) %>%
+            summarise(PERCENTAGE = mean(VALUE)) %>%
+            pivot_wider(names_from = GENE, values_from = PERCENTAGE, 
+                        values_fill = list(PERCENTAGE = 0))
           
           reshaped_data(data %>%
-            column_to_rownames(var = "PATIENT"))
-
+                          column_to_rownames(var = "PATIENT"))
+          
           output$DeleteColumn <- render_delete_column_ui("DeleteColumn", 
                                                          "Delete column", 
                                                          reshaped_data())
@@ -1215,8 +1262,8 @@ server <- function(input, output, session) {
       }
     }
   })
-
-############################ Inference  ########################################
+  
+  ############################ Inference  ########################################
   
   # Inference btn
   observeEvent(input$submitBtn, {
@@ -1231,14 +1278,14 @@ server <- function(input, output, session) {
     }
     else if ((input$resamplingFlag == FALSE) && (is.null(input$regularization)
                                                  ||is.null(input$command) || 
-             is.na(input$restarts) || is.na(input$seed))){
-          showNotification("Fill in all fields", type = "error")
+                                                 is.na(input$restarts) || is.na(input$seed))){
+      showNotification("Fill in all fields", type = "error")
     }
     else if ((input$resamplingFlag == TRUE) && (is.null(input$regularization)
                                                 ||is.null(input$command) || 
-          is.na(input$restarts) || is.na(input$seed) || 
-          is.na(input$nresampling))){
-        showNotification("Fill in all fields", type = "error")
+                                                is.na(input$restarts) || is.na(input$seed) || 
+                                                is.na(input$nresampling))){
+      showNotification("Fill in all fields", type = "error")
     }
     else {
       if(is.na(filter)) {
@@ -1252,19 +1299,19 @@ server <- function(input, output, session) {
         genotype_table(ifelse(genotype_table() >= filter, 1, 0))
         
         df <- as.data.frame(genotype_table())
-  
+        
         df <- df %>%
           mutate(id = sapply(strsplit(row.names(df), "\t"), `[`, 1))
-  
+        
         result <- df %>%
           group_by(id) %>%
           summarize(across(everything(), ~mean(. != 0)))
         
         result <- result %>%
           column_to_rownames(var = "id")
-  
+        
         genotype_table(ifelse(result >= filter_perc, 1, 0))
-  
+        
       }
       updateTabItems(session, "sidebarMenu", "inference")
       
@@ -1280,7 +1327,6 @@ server <- function(input, output, session) {
             column <- intersect(colnames(genotype_table()), colnames(reshaped_data()))
             row <- intersect(rownames(genotype_table()), rownames(reshaped_data()))
             reshaped_data_inference(subset(reshaped_data(), rownames(reshaped_data()) %in% row, select = column))
-            
             if (input$resamplingFlag == FALSE) {
               
               progress <- withProgress(
@@ -1317,7 +1363,6 @@ server <- function(input, output, session) {
           else if((case()=="bulk_multiple" && !is.na(filter_perc))|| case() == "single_cell") {
             models <- readMatrixFiles(selected_folder())
             models_filtrati_dati <- models
-            
             if (!is.null(input$DeleteRow)) {
               modelli_da_rimuovere <- unlist(strsplit(input$DeleteRow, ","))
               models_filtrati <- setdiff(names(models), modelli_da_rimuovere)
@@ -1469,7 +1514,7 @@ server <- function(input, output, session) {
       }
       
       if (input$visualize_inference == "rankingEstimate") {
-
+        
         output$graph_inference <- NULL
         selected_result[, "variable"] <- row.names(selected_result)
         selected_result[, "rank"] <- as.integer(selected_result[, "rank"]) + 1
@@ -1513,51 +1558,65 @@ server <- function(input, output, session) {
       }
     }
   })
-
-############################ Confidence estimation #############################
-
+  
+  ############################ Confidence estimation #############################
+  
   # Callback function to handle click on input resamplingFlag
   observeEvent(input$submitBtn_confEstimation, {
     if (is.null(resampling_res())) {
       showNotification("Perform the inference phase first", type = "message")
-    } else {
-      tryCatch({
-        if(case()=="bulk_single") {
+    } 
+    else if (is.null(case())) {
+      showNotification("Upload the genomic file in the previous step", type = "error")
+    }
+    else if (is.null(input$iteration_confEstimation) || ((input$resamplingFlag_conf == TRUE) && (is.null(input$nresampling_conf)))){
+      showNotification("Fill in all fields", type = "error")
+    }
+    else{
+      
+      if(case()=="bulk_single") {
+        if(input$resamplingFlag_conf == FALSE) {
+          res <- asceticCCFAssessment(
+            inference = resampling_res(),
+            niterations = input$iteration_confEstimation,
+          )
+        }
+        else {
           res <- asceticCCFAssessment(
             inference = resampling_res(),
             niterations = input$iteration_confEstimation,
             vafDataset = reshaped_data2(),
-            nsampling = input$nresampling_confEstimation,
+            nsampling = input$nresampling_conf,
           )
         }
-        else{
+      }
+      else{
+        if(input$resamplingFlag_conf == FALSE) {
           res <- asceticPhylogeniesAssessment(
             inference = resampling_res(),
             niterations = input$iteration_confEstimation,
-            nsampling = input$nresampling_confEstimation
           )
         }
-        print(res)
-        conf_res(res)
-        
-        if(!is.null(res)) {
-          
-          names_to_remove <- c("dataset", "models", "ccfDataset", "inference")
-          names <- setdiff(names(res), names_to_remove)
-          names <- c(names, names(res$inference))
-          visualizeConfidenceOutput(TRUE)
-          output$visualize_conf <- renderUI({selectInput("visualize_conf", 
-                                                         "Output confidence", 
-                                                         c(names),
-                                                         selected = "poset")})
+        else {
+          res <- asceticPhylogeniesAssessment(
+            inference = resampling_res(),
+            niterations = input$iteration_confEstimation,
+            nsampling = input$nresampling_conf
+          )
         }
-      }, error = function(e) {
-        visualizeConfidenceOutput(FALSE)
-        output$visualize_conf <- NULL
-        output$selected_result_output_conf <- NULL
-        output$graph_conf <- NULL
-        showNotification("Select the correct folder in the previous step", type = "error")
-      })
+      }
+      conf_res(res)
+      if(!is.null(res)) {
+        
+        names_to_remove <- c("dataset", "models", "ccfDataset", "inference")
+        names <- setdiff(names(res), names_to_remove)
+        names <- c(names, names(res$inference))
+        visualizeConfidenceOutput(TRUE)
+        output$visualize_conf <- renderUI({selectInput("visualize_conf", 
+                                                       "Output confidence", 
+                                                       c(names),
+                                                       selected = "poset")})
+      }
     }
   })
   
@@ -1579,7 +1638,7 @@ server <- function(input, output, session) {
       if (input$visualize_conf == "ranking") {
         ranking_df <- as.data.frame(selected_result)
         ranking_df <- data.frame(genes = rownames(ranking_df), rank = ranking_df$selected_result)
-
+        
         reactive_selected_result_conf (ranking_df)
         output$selected_result_output_conf <- renderDT({
           datatable(
@@ -1600,7 +1659,7 @@ server <- function(input, output, session) {
           datatable(reactive_selected_result_conf(), options = list(scrollX = TRUE), rownames = TRUE, selection = "single")
         })
       } else {
-
+        
         if (all(selected_result == 0)) {
           showNotification("No DAG available", type = "message")
           output$graph_conf <- NULL
@@ -1624,9 +1683,39 @@ server <- function(input, output, session) {
       }
     }
   })
-
   
-############################ Save project  ################################# 
+  
+  # Callback function to handle click on input resamplingFlag
+  observeEvent(input$resamplingFlag_conf, {
+    # Check whether the resampling flag has been activated.
+    if (input$resamplingFlag_conf) {
+      # Check if case is not null and if it's bulk_single, whether the file is loaded
+      if (!is.null(case()) && (case() != "bulk_single" || 
+                               !is.null(input$dataTable2) || 
+                               !is.null(reshaped_data2()))) {
+        if (!is.null(nresampling_conf())) {
+          output$nresampling_conf <- renderUI({
+            numericInput("nresampling_conf", "Number of samplings", nresampling_conf(), min = 3)
+          })
+        } else {
+          output$nresampling_conf <- renderUI({
+            numericInput("nresampling_conf", "Number of samplings", 3, min = 3)
+          })
+        }
+      } else {
+        # If the condition is not met, show a warning
+        showNotification("Load the resampling file in the previous step", type = "warning")
+        # Update resamplingFlag_conf back to FALSE
+        updateCheckboxInput(session, "resamplingFlag_conf", value = FALSE)
+      }
+    } else {
+      # If resamplingFlag_conf is off, remove the nresampling_conf input
+      output$nresampling_conf <- NULL
+    }
+  })
+  
+  
+  ############################ Save project  ################################# 
   
   observe({
     if (input$project_name != "") {
@@ -1653,7 +1742,7 @@ server <- function(input, output, session) {
       saveData(reshaped_data() , directory_file)
       values <- c("binarization", "del_col", "del_row", "flag_resampling", 
                   "nresampling", "restarts", "regularization", "command", 
-                  "seed", "output_inference")
+                  "seed", "iteration", "flag_confidence", "nresampling_confidence", "output_inference")
       
       sequence <- ifelse((!is.null(input$binarization)), input$binarization, NA)
       sequence <- c(sequence, ifelse((!is.null(input$DeleteColumn)), 
@@ -1671,15 +1760,24 @@ server <- function(input, output, session) {
       sequence <- c(sequence, ifelse((!is.null(input$command)), 
                                      input$command, NA))
       sequence <- c(sequence, ifelse((!is.null(input$seed)), input$seed, NA))
-
+      
+      sequence <- c(sequence, ifelse((!is.null(input$iteration_confEstimation)), input$iteration_confEstimation, NA))
+      
+      sequence <- c(sequence, ifelse((!is.null(input$resamplingFlag_conf)), input$resamplingFlag_conf, NA))
+      
+      sequence <- c(sequence, ifelse((!is.null(input$nresampling_conf)), input$nresampling_conf, NA))
+      
+      
+      
+      
       matrix_data <- matrix(data = c(values, sequence),
-                             nrow = length(values),
-                             ncol = 2,
-                             byrow = FALSE)
+                            nrow = length(values),
+                            ncol = 2,
+                            byrow = FALSE)
       
       matrix_dataframe <- as.data.frame(matrix_data)
       colnames(matrix_dataframe) <- c("name", "value")
-
+      
       directory_file <- paste0(directory_complete, "/parameters.csv")
       saveData(matrix_dataframe , directory_file)
       
@@ -1687,6 +1785,12 @@ server <- function(input, output, session) {
         directory_file <- paste0(directory_complete, "/resampling_res.rds")
         saveRDS(resampling_res(), directory_file)
       }
+      
+      if(!is.null(conf_res())) {
+        directory_file <- paste0(directory_complete, "/confidence_res.rds")
+        saveRDS(conf_res(), directory_file)
+      }
+      
       
       if (case()=="bulk_single") {
         directory_file <- paste0(directory_complete, "/resampling_table.csv")
@@ -1701,9 +1805,9 @@ server <- function(input, output, session) {
                                        input$binarization_perc, NA))
         
         matrix_data <- matrix(data = c(values, sequence),
-                               nrow = length(values),
-                               ncol = 2,
-                               byrow = FALSE)
+                              nrow = length(values),
+                              ncol = 2,
+                              byrow = FALSE)
         
         matrix_dataframe <- as.data.frame(matrix_data)
         colnames(matrix_dataframe) <- c("name", "value")
@@ -1717,9 +1821,9 @@ server <- function(input, output, session) {
         sequence <- ifelse(!is.null(input$dir), toString(input$dir), NA)
         
         matrix_data <- matrix(data = c(values, sequence),
-                               nrow = length(values),
-                               ncol = 2,
-                               byrow = FALSE)
+                              nrow = length(values),
+                              ncol = 2,
+                              byrow = FALSE)
         matrix_dataframe <- as.data.frame(matrix_data)
         colnames(matrix_dataframe) <- c("name", "value")
         
