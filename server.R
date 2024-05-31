@@ -1578,7 +1578,7 @@ server <- function(input, output, session) {
         if(input$resamplingFlag_conf == FALSE) {
           res <- asceticCCFAssessment(
             inference = resampling_res(),
-            niterations = input$iteration_confEstimation,
+            niterations = input$iteration_confEstimation
           )
         }
         else {
@@ -1586,7 +1586,7 @@ server <- function(input, output, session) {
             inference = resampling_res(),
             niterations = input$iteration_confEstimation,
             vafDataset = reshaped_data2(),
-            nsampling = input$nresampling_conf,
+            nsampling = input$nresampling_conf
           )
         }
       }
@@ -1594,7 +1594,7 @@ server <- function(input, output, session) {
         if(input$resamplingFlag_conf == FALSE) {
           res <- asceticPhylogeniesAssessment(
             inference = resampling_res(),
-            niterations = input$iteration_confEstimation,
+            niterations = input$iteration_confEstimation
           )
         }
         else {
