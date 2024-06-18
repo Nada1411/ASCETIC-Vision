@@ -23,6 +23,8 @@ server <- function(input, output, session) {
   reactive_selected_result_conf <- reactiveVal(NULL)
   reshaped_data_matrix <- reactiveVal(NULL)
   buttonClicked <- reactiveVal(FALSE)
+  reshaped_dataSurv <- reactiveVal(FALSE)
+  genotype_table_surv <- reactiveVal(FALSE)
   
   # Active app
   observe({
@@ -48,6 +50,43 @@ server <- function(input, output, session) {
       )
     }
   })
+  
+  # Display the genotype table entry in survival phase 
+  output$dataFile_surv <- renderUI({
+    # Verifica se il checkbox è selezionato
+    if (input$load_file) {
+      tagList(
+        div(style = "align-items: center;", 
+            fileInput("dataFile_surv", 
+                      label = span("Genotype ", 
+                                   tags$i(id = "helpIcon", 
+                                          class = "fa fa-question-nitro", 
+                                          style="margin-left: 5px;"))),
+            bsTooltip(id = "helpIcon", 
+                      title = "Select the file containing the information about the sample taken and its CCF.", 
+                      placement = "right", trigger = "hover"),
+            actionButton("loadBtn_surv", "Load", class = "custom-button")
+        )
+      )
+    }
+  })
+  
+  output$dataFile2_surv <- renderUI({
+    tagList(
+      div(style = "align-items: center;", 
+          fileInput("dataFile2_surv", 
+                    label = span("File ", 
+                                 tags$i(id = "helpIcon", 
+                                        class = "fa fa-question-nitro", 
+                                        style="margin-left: 5px;"))),
+          bsTooltip(id = "helpIcon", 
+                    title = "Select the file containing the information about the sample taken and its CCF.", 
+                    placement = "right", trigger = "hover"),
+          actionButton("loadBtn2_surv", "Load", class = "custom-button")
+      )
+    )
+  })
+  
   
   # Regularization selectable in the confidence enstimation step are those that 
   # were used during the inference step
@@ -242,6 +281,13 @@ server <- function(input, output, session) {
       }
     })
   }
+  
+  observe({
+    value <- resampling_res()
+    # Update choices based on selected items in 'regularization surv'
+    updateSelectInput(session, "regularization_surv",
+                      choices = names(value$inference))
+  })
   
   # Selection/deletion of row and column
   modify_reshaped_data <- function(reshaped_data) {
@@ -1092,7 +1138,7 @@ server <- function(input, output, session) {
               summarise(CCF = sum(CCF)) %>%
               unite("ID", c("SAMPLE", "REGION"), sep = "\t") %>%
               pivot_wider(names_from = GENE, values_from = CCF, values_fill = 0) %>%
-              select(-ID, everything()) %>%
+              dplyr::select(-ID, everything()) %>% 
               column_to_rownames(var = "ID")
           )
           
@@ -1265,12 +1311,41 @@ server <- function(input, output, session) {
   
   ############################ Inference  ########################################
   
+  binarize_table <- function(filter, filter_perc, reshaped_data) {
+    genotype_table(reshaped_data)
+    
+    if(is.na(filter)) {
+      showNotification("Enter a valid value in the binarization field in the previous step", type = "error")
+    }
+    else if (case() == "bulk_single" || case() == "single_cell") {
+      #filter the genotype table
+      genotype_table(ifelse(genotype_table() >= filter, 1, 0))
+    }
+    else if (case() == "bulk_multiple") {
+      genotype_table(ifelse(genotype_table() >= filter, 1, 0))
+      
+      df <- as.data.frame(genotype_table())
+      
+      df <- df %>%
+        mutate(id = sapply(strsplit(row.names(df), "\t"), `[`, 1))
+      
+      result <- df %>%
+        group_by(id) %>%
+        summarize(across(everything(), ~mean(. != 0)))
+      
+      result <- result %>%
+        column_to_rownames(var = "id")
+      
+      genotype_table(ifelse(result >= filter_perc, 1, 0))
+      
+    }
+  }
+  
   # Inference btn
   observeEvent(input$submitBtn, {
     default_values_inference()
     filter <- input$binarization
     filter_perc <- input$binarization_perc
-    genotype_table(reshaped_data_matrix())
     
     # filter the genotype table according to the case
     if (is.null(case())) {
@@ -1288,31 +1363,7 @@ server <- function(input, output, session) {
       showNotification("Fill in all fields", type = "error")
     }
     else {
-      if(is.na(filter)) {
-        showNotification("Enter a valid value in the binarization field in the previous step", type = "error")
-      }
-      else if (case() == "bulk_single" || case() == "single_cell") {
-        #filter the genotype table
-        genotype_table(ifelse(genotype_table() >= filter, 1, 0))
-      }
-      else if (case() == "bulk_multiple") {
-        genotype_table(ifelse(genotype_table() >= filter, 1, 0))
-        
-        df <- as.data.frame(genotype_table())
-        
-        df <- df %>%
-          mutate(id = sapply(strsplit(row.names(df), "\t"), `[`, 1))
-        
-        result <- df %>%
-          group_by(id) %>%
-          summarize(across(everything(), ~mean(. != 0)))
-        
-        result <- result %>%
-          column_to_rownames(var = "id")
-        
-        genotype_table(ifelse(result >= filter_perc, 1, 0))
-        
-      }
+      binarize_table(filter, filter_perc, reshaped_data_matrix())
       updateTabItems(session, "sidebarMenu", "inference")
       
       res <- NULL
@@ -1713,6 +1764,268 @@ server <- function(input, output, session) {
       output$nresampling_conf <- NULL
     }
   })
+  
+  ############################ Input survival  #################################
+  
+  observeEvent(input$submit_surv, {
+    if (is.null(conf_res())) {
+      showNotification("Perform the confidence phase first", type = "message")
+    } else {
+      result <- conf_res()
+      regularization <- input$regularization_surv
+      matrix <- result$inference[[regularization]]
+      
+      positions_one <- which(matrix == 1, arr.ind = TRUE)
+      
+      pairs <- data.frame(
+        Genes = apply(positions_one, 1, function(idx) paste(rownames(matrix)[idx[1]], ".to.", colnames(matrix)[idx[2]], sep="")),
+        stringsAsFactors = FALSE
+      )
+      
+      targets <- sapply(strsplit(pairs$Genes, "\\.to\\."), function(x) x[2])
+      
+      incoming_edges <- colSums(matrix[, targets] > 0)
+      
+      genes_no_incoming <- names(incoming_edges[incoming_edges == 0])
+      
+      pairs$Genes <- ifelse(targets %in% genes_no_incoming, 
+                            paste("Root.to", targets, sep = "."),
+                            pairs$Genes)
+      
+      split_names <- strsplit(pairs$Genes, "\\.to\\.")
+      sources <- sapply(split_names, `[`, 1)
+      destinations <- sapply(split_names, `[`, 2)
+      
+      sources_no_destination <- sources[!sources %in% destinations]
+      
+      root_entries <- paste("Root.to", sources_no_destination, sep = ".")
+      
+      new_pairs <- data.frame(Genes = root_entries, stringsAsFactors = FALSE)
+      pairs <- rbind(pairs, new_pairs)
+      pairs <- unique(pairs)
+      
+      if (input$load_file) {
+        if (is.null(reshaped_dataSurv())) {
+          showNotification("Please select a genotype file", type = "error")
+        }
+        else {
+          filter_value <- input$binarization_surv
+          filter_perc <- input$binarization_percSurv
+          
+          
+          binarize_table_surv(filter_value, filter_perc, reshaped_dataSurv())
+          
+          mutation_db <- genotype_table_surv()
+          
+        }
+      } else {
+        
+        filter_value <- input$binarization
+        filter_perc <- input$binarization_perc
+        
+        
+        binarize_table(filter_value, filter_perc, reshaped_data_matrix())
+        mutation_db <- genotype_table()
+      }
+      
+      
+      output_db <- matrix(0, nrow = nrow(mutation_db), ncol = length(pairs$Genes), 
+                          dimnames = list(rownames(mutation_db), pairs$Genes))
+
+      for (i in seq_len(ncol(output_db))) {
+        pair <- strsplit(colnames(output_db)[i], "\\.to\\.")[[1]]
+        if (pair[1] == "Root") {
+          if (pair[2] %in% colnames(mutation_db)) {
+            output_db[, i] <- as.integer(mutation_db[, pair[2]] == 1)
+          } else {
+            output_db[, i] <- 0  
+          }
+        } else {
+          if (all(c(pair[1], pair[2]) %in% colnames(mutation_db))) {
+            output_db[, i] <- as.integer((mutation_db[, pair[1]] == 1) & (mutation_db[, pair[2]] == 1))
+          } else {
+            output_db[, i] <- 0  
+          }
+        }
+      }
+    
+      
+      # Checking for all-zero or all-one columns
+      all_zero_one <- apply(output_db, 2, function(col) all(col == 0) || all(col == 1))
+      if (any(all_zero_one)) {
+        removed_cols <- colnames(output_db)[which(all_zero_one)]
+        showNotification(paste("Columns", paste(removed_cols, collapse = " "), "have been removed"), type = "message")
+        output_db <- output_db[, !all_zero_one]
+      }
+      
+      
+      output$dataTable_surv <- renderDT({
+        datatable(output_db, options = list(scrollX = TRUE), 
+                  selection = "single")
+      })
+      
+    }
+  })
+  
+  
+  observeEvent(input$loadBtn_surv, {
+    inFile2 <- input$dataFile_surv
+    
+    if (is.null(inFile2)) {
+      showNotification("Please select a file", type = "error")
+    } else {
+      data <- read.table(inFile2$datapath, sep = "\t", header = TRUE, 
+                         stringsAsFactors = FALSE)
+      
+      #### Bulk single biopsy
+      if (ncol(data) == 3) {
+        data <- distinct(data, SAMPLE, GENE, .keep_all = TRUE)
+        reshaped_dataSurv(
+          acast(data, SAMPLE ~ GENE, value.var = "CCF", fill = 0)
+        )
+        
+        output$dataTable_GenotypeSurv <- renderDT({
+          datatable(reshaped_dataSurv(), options = list(scrollX = TRUE), 
+                    selection = "single")
+        })
+        
+        output$binarization_surv <- renderUI({
+          tagList(
+            div(style = "display: flex; align-items: center;",
+                numericInput("binarization_surv", 
+                             label = span("Filter to binarize ", 
+                                          tags$i(id = "helpIcon3", 
+                                                 class = "fa fa-question-circle", 
+                                                 style="margin-left: 5px;")), 
+                             value = 1, min = 0, max = 1, step = 0.01),
+                bsTooltip(id = "helpIcon3", 
+                          title = "Specify which threshold you want to use as a filter to binarize the database to be inputted into the next inference phase.", 
+                          placement = "right", trigger = "hover")
+            )
+          )
+        })
+      }
+      else if (ncol(data) == 4) {   
+        if (colnames(data)[2]=="REGION") {
+          data <- distinct(data, SAMPLE, REGION, GENE, .keep_all = TRUE)
+          
+          reshaped_dataSurv(
+            data %>%
+              group_by(SAMPLE, REGION, GENE) %>%
+              summarise(CCF = sum(CCF)) %>%
+              unite("ID", c("SAMPLE", "REGION"), sep = "\t") %>%
+              pivot_wider(names_from = GENE, values_from = CCF, values_fill = 0) %>%
+              dplyr::select(-ID, everything()) %>% 
+              column_to_rownames(var = "ID")
+          )
+          
+          output$dataTable_GenotypeSurv <- renderDT({
+            datatable(reshaped_dataSurv(), options = list(scrollX = TRUE), 
+                      selection = "single")
+          })
+          
+          output$binarization_surv <- renderUI({
+            tagList(
+              div(style = "display: flex; align-items: center;",
+                  numericInput("binarization_surv", 
+                               label = span("Filter to binarize ", 
+                                            tags$i(id = "helpIcon3", 
+                                                   class = "fa fa-question-circle", 
+                                                   style="margin-left: 5px;")), 
+                               value = 1, min = 0, max = 1, step = 0.01),
+                  bsTooltip(id = "helpIcon3", 
+                            title = "Specify which threshold you want to use as a filter to binarize the database to be inputted into the next inference phase.", 
+                            placement = "right", trigger = "hover")
+              )
+            )
+          })
+          
+          
+          output$binarization_percSurv <- renderUI({
+            tagList(
+              div(style = "display: flex; align-items: center;",
+                  numericInput("binarization_perc", 
+                               label = span("Filter to binarize percentage ", 
+                                            tags$i(id = "helpIcon4", 
+                                                   class = "fa fa-question-circle", 
+                                                   style="margin-left: 5px;")), 
+                               value = 1, min = 0, max = 1, step = 0.01),
+                  bsTooltip(id = "helpIcon4", 
+                            title = "Specify the threshold you want to use as a filter to binarize the percentage of mutated regions in each sample of the database to be inputted into the next inference phase.", 
+                            placement = "right", trigger = "hover")
+              )
+            )
+          })
+        }
+        else if (colnames(data)[2]=="CELL") {
+          data <- distinct(data, PATIENT, CELL, GENE, .keep_all = TRUE)
+          
+          data <- data %>%
+            group_by(PATIENT, GENE) %>%
+            summarise(PERCENTAGE = mean(VALUE)) %>%
+            pivot_wider(names_from = GENE, values_from = PERCENTAGE, 
+                        values_fill = list(PERCENTAGE = 0))
+          
+          reshaped_dataSurv(data %>%
+                              column_to_rownames(var = "PATIENT"))
+          
+          output$dataTable_GenotypeSurv <- renderDT({
+            datatable(reshaped_dataSurv(), options = list(scrollX = TRUE), 
+                      selection = "single")
+          })
+          
+          output$binarization_surv <- renderUI({
+            tagList(
+              div(style = "display: flex; align-items: center;",
+                  numericInput("binarization_surv", 
+                               label = span("Filter to binarize ", 
+                                            tags$i(id = "helpIcon3", 
+                                                   class = "fa fa-question-circle", 
+                                                   style="margin-left: 5px;")), 
+                               value = 1, min = 0, max = 1, step = 0.01),
+                  bsTooltip(id = "helpIcon3", 
+                            title = "Specify which threshold you want to use as a filter to binarize the database to be inputted into the next inference phase.", 
+                            placement = "right", trigger = "hover")
+              )
+            )
+          })
+        }
+      }
+    }
+  })
+  
+  binarize_table_surv <- function(filter, filter_perc, reshaped_data) {
+    genotype_table_surv(reshaped_data)
+    
+    if(is.na(filter)) {
+      showNotification("Enter a valid value in the binarization field", type = "error")
+    }
+    else if (case() == "bulk_single" || case() == "single_cell") {
+      #filter the genotype_table_surv table
+      genotype_table_surv(ifelse(genotype_table_surv() >= filter, 1, 0))
+    }
+    else if (case() == "bulk_multiple") {
+      genotype_table_surv(ifelse(genotype_table_surv() >= filter, 1, 0))
+      
+      df <- as.data.frame(genotype_table_surv())
+      
+      df <- df %>%
+        mutate(id = sapply(strsplit(row.names(df), "\t"), `[`, 1))
+      
+      result <- df %>%
+        group_by(id) %>%
+        summarize(across(everything(), ~mean(. != 0)))
+      
+      result <- result %>%
+        column_to_rownames(var = "id")
+      
+      genotype_table_surv(ifelse(result >= filter_perc, 1, 0))
+      
+    }
+  }
+  
+  
+  
   
   
   ############################ Save project  ################################# 

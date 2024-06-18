@@ -235,3 +235,5 @@ $(document).on('click', '#geneInfoLink', function() {
   window.open($(this).attr('href'), '_blank');
   return false;
 });
+
+

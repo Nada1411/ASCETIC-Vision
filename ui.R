@@ -17,6 +17,7 @@ shinyUI(
         menuItem("Input data", tabName = "input", icon = icon("database")),
         menuItem("Inference", tabName = "inference", icon = icon("chart-line")),
         menuItem("Confidence estimation", tabName = "confidence_estimation", icon = icon("think-peaks")),
+        menuItem("Input data", tabName = "input_surv", icon = icon("database")),
         menuItem("Save project", tabName = "save", icon = icon("save"))
       )
     ),
@@ -276,6 +277,57 @@ shinyUI(
             ),
             style = "margin-bottom: 500px;",
           )
+        ),
+        tabItem(
+          tabName = "input_surv",
+          fluidPage(
+            class = "custom-fluid-inputPage",
+            fluidRow(
+              column(6,
+                     selectInput("regularization_surv", "Regularization", choices = NULL),
+                     uiOutput("dataFile2_surv"),
+                     actionButton("submit_surv", "Submit", class = "custom-button", style = "margin-top: 30px;")
+              ),
+              column(6,
+                     tags$div(
+                       tags$div(style="margin-top: 25px;",  
+                                checkboxInput("load_file", 
+                                              HTML("<strong>Use a different genotype file</strong>")),
+                       ),
+                       tags$div(style="margin-top: 30px;",  
+                                uiOutput("dataFile_surv")
+                       ),
+                       column(6,
+                              uiOutput("binarization_surv"),
+                              uiOutput("binarization_percSurv")
+                       )
+                     )
+              )
+            ),
+            fluidRow(
+              column(6,
+                     uiOutput("DeleteColumn_surv"),
+              )
+            ),
+            fluidRow(
+              column(6,
+                     uiOutput("DeleteRow_surv"),
+              )
+            ),
+            fluidRow(
+              column(12,
+                     style = "margin-top: 30px;",
+                     DTOutput("dataTable_GenotypeSurv")
+              )
+            ),
+            fluidRow(
+              column(12,
+                    style = "margin-top: 30px;",
+                    DTOutput("dataTable_surv")
+              )
+            ),
+          ),
+          style = "margin-bottom: 500px;",
         ),
         tabItem(
           tabName = "save",
