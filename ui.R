@@ -11,13 +11,46 @@ shinyUI(
               uiOutput("project_info"))      
     ),
     dashboardSidebar(
+      tags$head(
+        tags$style(HTML("
+        .fa-i, .fa-s {
+          transition: color 0.3s ease-in-out; 
+        }
+        .sidebar-menu li.active .fa-i,
+        .sidebar-menu li.active .fa-s {
+          color: #222D32 !important; 
+        }
+        .fa-i {
+          color: #A8FA7F !important; 
+        }
+        .fa-s {
+          color: #FAEE38 !important; 
+        }
+      "))
+      ),
       sidebarMenu(
         id = "sidebarMenu",
         menuItem("Home page", tabName = "home", icon = icon("home")),
-        menuItem("Input data", tabName = "input", icon = icon("database")),
-        menuItem("Inference", tabName = "inference", icon = icon("chart-line")),
-        menuItem("Confidence estimation", tabName = "confidence_estimation", icon = icon("think-peaks")),
-        menuItem("Input data", tabName = "input_surv", icon = icon("database")),
+        menuItem(
+          HTML("Input data <span style='float: right; transform: scale(0.6);'><i class='fa fa-i'></i></span>"), 
+          tabName = "input", 
+          icon = icon("database")
+        ),
+        menuItem(
+          HTML("Inference <span style='float: right; transform: scale(0.6);'><i class='fa fa-i'></i></span>"), 
+          tabName = "inference", 
+          icon = icon("chart-line")
+        ),
+        menuItem(
+          HTML("Confidence estimation <span style='float: right; transform: scale(0.55);'><i class='fa fa-i'></i></span>"), 
+          tabName = "confidence_estimation", 
+          icon = icon("think-peaks")
+        ),
+        menuItem(
+          HTML("Input data <span style='float: right; transform: scale(0.55);'><i class='fa fa-s'></i></span>"), 
+          tabName = "input_surv", 
+          icon = icon("database")
+        ),
         menuItem("Save project", tabName = "save", icon = icon("save"))
       )
     ),
@@ -153,7 +186,7 @@ shinyUI(
                      uiOutput("nresampling", style = "margin-top: 25px;")
               ),
               column(12, align = "left",
-                     actionButton("submitBtn", "Invia", class = "custom-button")
+                     actionButton("submitBtn", "Submit", class = "custom-button")
               ),
             ),
             fluidPage(
@@ -297,22 +330,19 @@ shinyUI(
                        tags$div(style="margin-top: 30px;",  
                                 uiOutput("dataFile_surv")
                        ),
-                       column(6,
-                              uiOutput("binarization_surv"),
-                              uiOutput("binarization_percSurv")
-                       )
                      )
               )
             ),
-            fluidRow(
-              column(6,
-                     uiOutput("DeleteColumn_surv"),
-              )
+            div(style = "margin-top: 30px;",  
+                fluidRow(
+                  column(6, uiOutput("DeleteColumn_surv")),
+                  column(6, uiOutput("binarization_surv"))
+                )
             ),
+            
             fluidRow(
-              column(6,
-                     uiOutput("DeleteRow_surv"),
-              )
+              column(6, uiOutput("DeleteRow_surv")),
+              column(6, uiOutput("binarization_percSurv"))
             ),
             fluidRow(
               column(12,

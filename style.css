@@ -236,4 +236,14 @@ $(document).on('click', '#geneInfoLink', function() {
   return false;
 });
 
+tags$head(
+  tags$style(HTML("
+    .main-sidebar .sidebar-menu .treeview-menu>li>a {
+      padding-right: 2.25rem;
+    }
+    .fa-s {
+      padding-right: 10px;
+    }
+  "))
+)
 

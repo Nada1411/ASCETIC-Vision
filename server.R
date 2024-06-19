@@ -25,6 +25,7 @@ server <- function(input, output, session) {
   buttonClicked <- reactiveVal(FALSE)
   reshaped_dataSurv <- reactiveVal(FALSE)
   genotype_table_surv <- reactiveVal(FALSE)
+  orig_genotypeSurv <- reactiveVal(FALSE)
   
   # Active app
   observe({
@@ -114,6 +115,24 @@ server <- function(input, output, session) {
   })
   
   
+  observeEvent(input$binarization_surv, {
+    x <- input$binarization_surv
+    if ( !is.na(x) && (x > 1 || x < 0)){
+      updateNumericInput(session, "binarization_surv", value = 1)
+      showNotification("Allowed range 0-1 ", type = "warning")
+    }
+  })
+  
+  # Percentage binarization field constraint management
+  observeEvent(input$binarization_percSurv, {
+    x <- input$binarization_percSurv
+    if ( !is.na(x) && (x > 1 || x < 0)){
+      updateNumericInput(session, "binarization_percSurv", value = 1)
+      showNotification("Allowed range 0-1 ", type = "warning")
+    }
+  })
+  
+  
   ############################ Function  #######################################
   
   reset_common_values <- function() {
@@ -189,6 +208,13 @@ server <- function(input, output, session) {
     output$visualize_inference <- NULL
     output$visualize_conf <- NULL
     app_activated(FALSE)
+    output$binarization_percSurv <- NULL
+    output$binarization_surv <- NULL
+    output$DeleteColumn_surv <- NULL
+    output$DeleteRow_surv <- NULL
+    updateCheckboxInput(session, "load_file", value = FALSE)
+    output$dataTable_GenotypeSurv <- NULL
+    output$dataTable_surv <- NULL
   }
   
   # Resets values when submit btm in inference
@@ -284,9 +310,14 @@ server <- function(input, output, session) {
   
   observe({
     value <- resampling_res()
-    # Update choices based on selected items in 'regularization surv'
-    updateSelectInput(session, "regularization_surv",
-                      choices = names(value$inference))
+    print(value)
+    if (is.null(value)) {
+      print("1")
+      updateSelectInput(session, "regularization_surv", choices = list())
+    } else {
+      print("2")
+      updateSelectInput(session, "regularization_surv", choices = names(value$inference))
+    }
   })
   
   # Selection/deletion of row and column
@@ -1687,8 +1718,10 @@ server <- function(input, output, session) {
       }
       
       if (input$visualize_conf == "ranking") {
+        output$graph_conf <- NULL
         ranking_df <- as.data.frame(selected_result)
-        ranking_df <- data.frame(genes = rownames(ranking_df), rank = ranking_df$selected_result)
+        ranking_df <- data.frame(genes = rownames(ranking_df), 
+                                 rank = ranking_df$selected_result)
         
         reactive_selected_result_conf (ranking_df)
         output$selected_result_output_conf <- renderDT({
@@ -1707,7 +1740,8 @@ server <- function(input, output, session) {
         output$graph_conf <- NULL
         reactive_selected_result_conf (selected_result)
         output$selected_result_output_conf <- renderDT({
-          datatable(reactive_selected_result_conf(), options = list(scrollX = TRUE), rownames = TRUE, selection = "single")
+          datatable(reactive_selected_result_conf(), options = list(scrollX = TRUE),
+                    rownames = TRUE, selection = "single")
         })
       } else {
         
@@ -1746,7 +1780,8 @@ server <- function(input, output, session) {
                                !is.null(reshaped_data2()))) {
         if (!is.null(nresampling_conf())) {
           output$nresampling_conf <- renderUI({
-            numericInput("nresampling_conf", "Number of samplings", nresampling_conf(), min = 3)
+            numericInput("nresampling_conf", "Number of samplings", 
+                         nresampling_conf(), min = 3)
           })
         } else {
           output$nresampling_conf <- renderUI({
@@ -1755,7 +1790,8 @@ server <- function(input, output, session) {
         }
       } else {
         # If the condition is not met, show a warning
-        showNotification("Load the resampling file in the previous step", type = "warning")
+        showNotification("Load the resampling file in the previous step", 
+                         type = "warning")
         # Update resamplingFlag_conf back to FALSE
         updateCheckboxInput(session, "resamplingFlag_conf", value = FALSE)
       }
@@ -1778,7 +1814,10 @@ server <- function(input, output, session) {
       positions_one <- which(matrix == 1, arr.ind = TRUE)
       
       pairs <- data.frame(
-        Genes = apply(positions_one, 1, function(idx) paste(rownames(matrix)[idx[1]], ".to.", colnames(matrix)[idx[2]], sep="")),
+        Genes = apply(positions_one, 1, 
+                      function(idx) paste(rownames(matrix)[idx[1]], 
+                                          ".to.", colnames(matrix)[idx[2]], 
+                                          sep="")),
         stringsAsFactors = FALSE
       )
       
@@ -1854,7 +1893,8 @@ server <- function(input, output, session) {
       all_zero_one <- apply(output_db, 2, function(col) all(col == 0) || all(col == 1))
       if (any(all_zero_one)) {
         removed_cols <- colnames(output_db)[which(all_zero_one)]
-        showNotification(paste("Columns", paste(removed_cols, collapse = " "), "have been removed"), type = "message")
+        showNotification(paste("Columns", paste(removed_cols, collapse = " "), 
+                               "have been removed"), type = "message")
         output_db <- output_db[, !all_zero_one]
       }
       
@@ -1866,7 +1906,6 @@ server <- function(input, output, session) {
       
     }
   })
-  
   
   observeEvent(input$loadBtn_surv, {
     inFile2 <- input$dataFile_surv
@@ -1885,8 +1924,7 @@ server <- function(input, output, session) {
         )
         
         output$dataTable_GenotypeSurv <- renderDT({
-          datatable(reshaped_dataSurv(), options = list(scrollX = TRUE), 
-                    selection = "single")
+          datatable(reshaped_dataSurv(), options = list(scrollX = TRUE))
         })
         
         output$binarization_surv <- renderUI({
@@ -1904,6 +1942,9 @@ server <- function(input, output, session) {
             )
           )
         })
+        
+        output$binarization_percSurv <- NULL
+        
       }
       else if (ncol(data) == 4) {   
         if (colnames(data)[2]=="REGION") {
@@ -1920,8 +1961,7 @@ server <- function(input, output, session) {
           )
           
           output$dataTable_GenotypeSurv <- renderDT({
-            datatable(reshaped_dataSurv(), options = list(scrollX = TRUE), 
-                      selection = "single")
+            datatable(reshaped_dataSurv(), options = list(scrollX = TRUE))
           })
           
           output$binarization_surv <- renderUI({
@@ -1970,8 +2010,7 @@ server <- function(input, output, session) {
                               column_to_rownames(var = "PATIENT"))
           
           output$dataTable_GenotypeSurv <- renderDT({
-            datatable(reshaped_dataSurv(), options = list(scrollX = TRUE), 
-                      selection = "single")
+            datatable(reshaped_dataSurv(), options = list(scrollX = TRUE))
           })
           
           output$binarization_surv <- renderUI({
@@ -1989,8 +2028,18 @@ server <- function(input, output, session) {
               )
             )
           })
+          
+          output$binarization_percSurv <- NULL
         }
       }
+      output$DeleteColumn_surv <- render_delete_column_ui("DeleteColumn_surv", 
+                                                          "Delete column", 
+                                                          reshaped_dataSurv())
+      output$DeleteRow_surv <- render_delete_row_ui("DeleteRow_surv", 
+                                                    "Delete row", 
+                                                    reshaped_dataSurv())
+      
+      orig_genotypeSurv(reshaped_dataSurv())
     }
   })
   
@@ -2024,6 +2073,44 @@ server <- function(input, output, session) {
     }
   }
   
+  modify_reshaped_dataSurv <- function(reshaped_data) {
+    reshaped_data_df <- as.data.frame(reshaped_data)  # Conversione in data.frame
+    
+    if (!is.null(input$DeleteColumn_surv) && length(input$DeleteColumn_surv) > 0) {
+      cols_to_delete <- unlist(strsplit(input$DeleteColumn_surv, ",\\s*"))
+      if (any(input$DeleteColumn_surv %in% colnames(reshaped_data_df))) {
+        reshaped_data_df <- reshaped_data_df[, !colnames(reshaped_data_df) 
+                                             %in% input$DeleteColumn_surv, drop = FALSE]
+      }
+    }
+
+    if (!is.null(input$DeleteRow_surv) && length(input$DeleteRow_surv) > 0) {
+      rows_to_delete <- as.numeric(unlist(strsplit(input$DeleteRow_surv, ",\\s*")))
+      if (any(input$DeleteRow_surv %in% rownames(reshaped_data_df)) || 
+          any(as.numeric(input$DeleteRow_surv) %in% 1:nrow(reshaped_data_df))) {
+        reshaped_data_df <- reshaped_data_df[!rownames(reshaped_data_df) 
+                                             %in% input$DeleteRow_surv, , drop = FALSE]
+      }
+    }
+    
+    return(reshaped_data_df)
+  }
+  
+  observe({
+    req(reshaped_dataSurv())  # Assicura che i dati iniziali siano caricati
+    updated_data <- modify_reshaped_dataSurv(orig_genotypeSurv())
+    reshaped_dataSurv(updated_data)  # Aggiorna il valore reattivo
+    
+    # Mantieni il valore dell'input per le colonne dopo l'aggiornamento
+    updateTextInput(session, "DeleteColumn_surv", value = input$DeleteColumn_surv)
+    updateTextInput(session, "DeleteRow_surv", value = input$DeleteRow_surv)
+  })
+  
+  # Rendering della DataTable
+  output$dataTable_GenotypeSurv <- renderDT({
+    req(reshaped_dataSurv())  # Assicura la presenza di dati
+    datatable(reshaped_dataSurv(), options = list(scrollX = TRUE))
+  })
   
   
   
