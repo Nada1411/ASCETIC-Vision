@@ -10,6 +10,7 @@ server <- function(input, output, session) {
   reshaped_data_inference <- reactiveVal(NULL)
   genotype_table <- reactiveVal(NULL)
   case <- reactiveVal(NULL)
+  case_surv <- reactiveVal(NULL)
   resampling_res <- reactiveVal(NULL)
   conf_res <- reactiveVal(NULL)
   reshaped_data2 <- reactiveVal(NULL)
@@ -23,14 +24,34 @@ server <- function(input, output, session) {
   reactive_selected_result_conf <- reactiveVal(NULL)
   reshaped_data_matrix <- reactiveVal(NULL)
   buttonClicked <- reactiveVal(FALSE)
-  reshaped_dataSurv <- reactiveVal(FALSE)
+  reshaped_dataSurv <- reactiveVal(NULL)
   genotype_table_surv <- reactiveVal(FALSE)
   orig_genotypeSurv <- reactiveVal(FALSE)
+  surv_data <- reactiveVal(NULL)
+  evo_step <- reactiveVal(NULL)
   
   # Active app
   observe({
     if (!app_activated()) {
       app_activated(TRUE)
+    }
+  })
+  
+  output$dataFile2_surv <- renderUI({
+    if (app_activated()) {
+      tagList(
+        div(style = "align-items: center;", 
+            fileInput("dataFile2_surv", 
+                      label = span("Survival data", 
+                                   tags$i(id = "helpIcon", 
+                                          class = "fa fa-question-nitro", 
+                                          style="margin-left: 5px;"))),
+            bsTooltip(id = "helpIcon", 
+                      title = "Select the file containing the information about the sample taken and its CCF.", 
+                      placement = "right", trigger = "hover"),
+            actionButton("loadBtn2_surv", "Load", class = "custom-button")
+        )
+      )
     }
   })
   
@@ -70,22 +91,6 @@ server <- function(input, output, session) {
         )
       )
     }
-  })
-  
-  output$dataFile2_surv <- renderUI({
-    tagList(
-      div(style = "align-items: center;", 
-          fileInput("dataFile2_surv", 
-                    label = span("File ", 
-                                 tags$i(id = "helpIcon", 
-                                        class = "fa fa-question-nitro", 
-                                        style="margin-left: 5px;"))),
-          bsTooltip(id = "helpIcon", 
-                    title = "Select the file containing the information about the sample taken and its CCF.", 
-                    placement = "right", trigger = "hover"),
-          actionButton("loadBtn2_surv", "Load", class = "custom-button")
-      )
-    )
   })
   
   
@@ -310,12 +315,9 @@ server <- function(input, output, session) {
   
   observe({
     value <- resampling_res()
-    print(value)
     if (is.null(value)) {
-      print("1")
       updateSelectInput(session, "regularization_surv", choices = list())
     } else {
-      print("2")
       updateSelectInput(session, "regularization_surv", choices = names(value$inference))
     }
   })
@@ -1376,7 +1378,8 @@ server <- function(input, output, session) {
   observeEvent(input$submitBtn, {
     default_values_inference()
     filter <- input$binarization
-    filter_perc <- input$binarization_perc
+    filter_perc <- input$binarization_percSurv
+
     
     # filter the genotype table according to the case
     if (is.null(case())) {
@@ -1801,11 +1804,16 @@ server <- function(input, output, session) {
     }
   })
   
+  
   ############################ Input survival  #################################
   
   observeEvent(input$submit_surv, {
     if (is.null(conf_res())) {
       showNotification("Perform the confidence phase first", type = "message")
+    } else if (input$load_file & is.null(reshaped_dataSurv())) {
+        showNotification("Please select a genotype file", type = "error")
+    } else if (is.null(surv_data())) {
+      showNotification("Please upload survival file", type = "error")
     } else {
       result <- conf_res()
       regularization <- input$regularization_surv
@@ -1844,10 +1852,7 @@ server <- function(input, output, session) {
       pairs <- unique(pairs)
       
       if (input$load_file) {
-        if (is.null(reshaped_dataSurv())) {
-          showNotification("Please select a genotype file", type = "error")
-        }
-        else {
+
           filter_value <- input$binarization_surv
           filter_perc <- input$binarization_percSurv
           
@@ -1856,7 +1861,7 @@ server <- function(input, output, session) {
           
           mutation_db <- genotype_table_surv()
           
-        }
+        
       } else {
         
         filter_value <- input$binarization
@@ -1888,6 +1893,13 @@ server <- function(input, output, session) {
         }
       }
     
+
+      surv_data <- surv_data()
+      common_samples <- intersect(rownames(output_db), surv_data$SAMPLE)
+
+      output_db <- output_db[rownames(output_db) %in% common_samples, ]
+      surv_data <- surv_data[surv_data$SAMPLE %in% common_samples, ]
+      surv_data(surv_data)
       
       # Checking for all-zero or all-one columns
       all_zero_one <- apply(output_db, 2, function(col) all(col == 0) || all(col == 1))
@@ -1898,17 +1910,32 @@ server <- function(input, output, session) {
         output_db <- output_db[, !all_zero_one]
       }
       
-      
+
       output$dataTable_surv <- renderDT({
         datatable(output_db, options = list(scrollX = TRUE), 
                   selection = "single")
       })
       
+      evo_step(output_db)
+    }
+  })
+  
+  observeEvent(input$loadBtn2_surv, {
+    inFile <- input$dataFile2_surv
+    
+    if (is.null(inFile)) {
+      showNotification("Please select a file", type = "error")
+    } else {
+      data <- read.table(inFile$datapath, sep = "\t", header = TRUE, 
+                         stringsAsFactors = FALSE)
+      
+      surv_data(data)
     }
   })
   
   observeEvent(input$loadBtn_surv, {
     inFile2 <- input$dataFile_surv
+    output$dataTable_surv <- NULL
     
     if (is.null(inFile2)) {
       showNotification("Please select a file", type = "error")
@@ -1918,6 +1945,7 @@ server <- function(input, output, session) {
       
       #### Bulk single biopsy
       if (ncol(data) == 3) {
+        case_surv("bulk_single")
         data <- distinct(data, SAMPLE, GENE, .keep_all = TRUE)
         reshaped_dataSurv(
           acast(data, SAMPLE ~ GENE, value.var = "CCF", fill = 0)
@@ -1948,6 +1976,7 @@ server <- function(input, output, session) {
       }
       else if (ncol(data) == 4) {   
         if (colnames(data)[2]=="REGION") {
+          case_surv("bulk_multiple")
           data <- distinct(data, SAMPLE, REGION, GENE, .keep_all = TRUE)
           
           reshaped_dataSurv(
@@ -1984,7 +2013,7 @@ server <- function(input, output, session) {
           output$binarization_percSurv <- renderUI({
             tagList(
               div(style = "display: flex; align-items: center;",
-                  numericInput("binarization_perc", 
+                  numericInput("binarization_percSurv", 
                                label = span("Filter to binarize percentage ", 
                                             tags$i(id = "helpIcon4", 
                                                    class = "fa fa-question-circle", 
@@ -1998,6 +2027,7 @@ server <- function(input, output, session) {
           })
         }
         else if (colnames(data)[2]=="CELL") {
+          case_surv("single_cell")
           data <- distinct(data, PATIENT, CELL, GENE, .keep_all = TRUE)
           
           data <- data %>%
@@ -2049,11 +2079,11 @@ server <- function(input, output, session) {
     if(is.na(filter)) {
       showNotification("Enter a valid value in the binarization field", type = "error")
     }
-    else if (case() == "bulk_single" || case() == "single_cell") {
+    else if (case_surv() == "bulk_single" || case_surv() == "single_cell") {
       #filter the genotype_table_surv table
       genotype_table_surv(ifelse(genotype_table_surv() >= filter, 1, 0))
     }
-    else if (case() == "bulk_multiple") {
+    else if (case_surv() == "bulk_multiple") {
       genotype_table_surv(ifelse(genotype_table_surv() >= filter, 1, 0))
       
       df <- as.data.frame(genotype_table_surv())
@@ -2064,11 +2094,14 @@ server <- function(input, output, session) {
       result <- df %>%
         group_by(id) %>%
         summarize(across(everything(), ~mean(. != 0)))
-      
+
       result <- result %>%
         column_to_rownames(var = "id")
-      
+
       genotype_table_surv(ifelse(result >= filter_perc, 1, 0))
+      
+      
+      
       
     }
   }
@@ -2112,9 +2145,135 @@ server <- function(input, output, session) {
     datatable(reshaped_dataSurv(), options = list(scrollX = TRUE))
   })
   
+  observeEvent(input$load_file, {
+    output$dataTable_GenotypeSurv <- NULL
+    output$dataTable_surv <- NULL
+    output$binarization_percSurv <- NULL
+    output$binarization_surv <- NULL
+    output$DeleteColumn_surv <- NULL
+    output$DeleteRow_surv <- NULL
+  })
   
   
   
+  ############################ Output survival  #################################
+  
+  observeEvent(input$calc_surv, {
+    if(is.null(evo_step())) {
+      showNotification("Calculate the evolutionary step first", type = "message")
+    } else {
+      #resExampleEvosigs <- evoSigs( survivalData = surv_data(),
+      #                              evolutionarySteps = evo_step() 
+      #                              )
+      data(amlExample)
+      resExampleEvosigs <- evoSigs( survivalData = amlExample$survival_data,
+                                    evolutionarySteps = amlExample$evolutionary_steps )
+      
+      output$combined_graph <- renderGirafe({
+        df_prev <- resExampleEvosigs$clustersPrevalence
+        if (!is.data.frame(df_prev)) {
+          df_prev <- as.data.frame(df_prev)
+        }
+        df_prev$Cluster <- factor(1:nrow(df_prev))
+        names(df_prev) <- gsub(".to.", " > ", names(df_prev))
+        df_prev_long <- melt(df_prev, id.vars = "Cluster", variable.name = "GenePair", value.name = "Prevalence")
+        df_prev_long$Source <- "Prev"
+        
+        result <- resExampleEvosigs$clustersPrevalence
+        for (col in colnames(result)) {
+          if (col %in% names(resExampleEvosigs$evolutionarySteps)) {
+            result[, col] <- ifelse(result[, col] != 0, 
+                                    resExampleEvosigs$evolutionarySteps[col], 0)
+          }
+        }
+        df_risk <- as.data.frame(result)
+        df_risk$Cluster <- factor(1:nrow(df_risk))
+        names(df_risk) <- gsub(".to.", " > ", names(df_risk))
+        df_risk_long <- melt(df_risk, id.vars = "Cluster", variable.name = "GenePair", value.name = "Prevalence")
+        df_risk_long$Source <- "Risk"
+        
+        combined_df <- rbind(df_prev_long, df_risk_long)
+        combined_df$Source <- factor(combined_df$Source, levels = c("Risk", "Prev"))
+        
+        combined_df$Color <- ifelse(combined_df$Source == "Prev", "#FFC0CA", 
+                                    ifelse(combined_df$Cluster == "1", "#1A9E76", 
+                                           ifelse(combined_df$Cluster == "2", "#D95F02",
+                                                  ifelse(combined_df$Cluster == "3", "#766FB4", "#E8298C"))))
+        
+        custom_labels <- function(x) {
+          ifelse(x %% 1 == 0, as.character(x), as.character(x))
+        }
+        
+        p <- ggplot(data = combined_df, aes(x = Prevalence, y = GenePair, fill = Color, tooltip = Prevalence, data_id = GenePair)) +
+          geom_bar_interactive(stat = "identity", position = position_dodge(width = 0.5), width = 0.4, hover_css = "fill: black;") +
+          facet_wrap(~ Cluster + Source, scales = "free_x", nrow = 1, strip.position = "top") +
+          scale_fill_identity() +
+          scale_x_continuous(breaks = seq(-1, 1, by = 0.5), labels = custom_labels) +
+          theme_minimal() +
+          theme(
+            axis.title = element_blank(),
+            axis.text.y = element_text(angle = 0, vjust = 0.5, size = 6),
+            axis.text.x = element_text(angle = 0, hjust = 0.5, size = 6),
+            legend.position = "none",
+            strip.text.x = element_text(angle = 0, hjust = 0.5, size = 6),
+            strip.text.y = element_text(angle = 0, hjust = 0.5, size = 6),
+            plot.title = element_text(hjust = 0.4, size = 9),  
+            panel.background = element_rect(fill = alpha("grey90", 0.5), color = NA),  
+            panel.grid.major = element_line(color = "white")
+          ) +
+          labs(y = "", x = "Prevalence", title = "Evolutionary Signatures")
+        
+        girafe(ggobj = p)
+      })
+      
+      new_df <- reactive({
+        times <- resExampleEvosigs$survivalAnalysis$data$times
+        status <- resExampleEvosigs$survivalAnalysis$data$status
+        clusters <- resExampleEvosigs$survivalAnalysis$clusters
+        df <- data.frame(times = times, status = status, clusters = clusters)
+        rownames(df) <- rownames(resExampleEvosigs$survivalAnalysis$data)
+        df
+      })
+      
+      
+      output$survPlot <- renderPlotly({
+        df <- new_df()  
+        fit <- survfit(Surv(times, status) ~ clusters, data = df)
+        
+        g <- ggsurvplot(fit, data = df, risk.table = FALSE,
+                        title = "Survival Probability",
+                        palette = "Dark2", legend.title = "Legend",
+                        ggtheme = theme_minimal(),
+                        censor = FALSE, pval = FALSE)  
+        
+        p <- ggplotly(g$plot)
+        
+        p <- p %>% layout(
+          title = list(text = "Survival Probability", font = list(size = 17), x = 0.5, xanchor = "center" ),
+          legend = list(orientation = "h", x = 0.5, xanchor = "center", y = 1.05),
+          annotations = list(
+            list(
+              text = "p<0.0001",
+              x = 0.05,  
+              xref = "paper",
+              y = 0.25,  
+              yref = "paper",
+              showarrow = FALSE,
+              font = list(size = 12)
+            )
+          )
+        )
+
+        
+        return(p)
+        
+      })
+      
+      
+      updateTabItems(session, "sidebarMenu", "output_surv")
+    }
+  })
+
   ############################ Save project  ################################# 
   
   observe({

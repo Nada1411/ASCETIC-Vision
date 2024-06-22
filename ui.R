@@ -51,6 +51,11 @@ shinyUI(
           tabName = "input_surv", 
           icon = icon("database")
         ),
+        menuItem(
+          HTML("Survival output <span style='float: right; transform: scale(0.55);'><i class='fa fa-s'></i></span>"), 
+          tabName = "output_surv", 
+          icon = icon("chart-line")
+        ),
         menuItem("Save project", tabName = "save", icon = icon("save"))
       )
     ),
@@ -319,7 +324,8 @@ shinyUI(
               column(6,
                      selectInput("regularization_surv", "Regularization", choices = NULL),
                      uiOutput("dataFile2_surv"),
-                     actionButton("submit_surv", "Submit", class = "custom-button", style = "margin-top: 30px;")
+                     actionButton("submit_surv", "Evolutionary step", class = "custom-button", style = "margin-top: 30px;"),
+                     actionButton("calc_surv", "Calculate survival", class = "custom-button", style = "margin-top: 30px;")
               ),
               column(6,
                      tags$div(
@@ -358,6 +364,19 @@ shinyUI(
             ),
           ),
           style = "margin-bottom: 500px;",
+        ),
+        tabItem(
+          tabName = "output_surv",
+          fluidPage(
+            fluidRow(
+              girafeOutput("combined_graph", width = "100%", height = "700px")
+            ),
+            div(style = "margin-top: 20px;"),
+            fluidRow(
+                  plotlyOutput("survPlot", width = "100%", height = "350px"),
+                  style = "width: 75%; margin: 0 auto;"
+            )
+          )
         ),
         tabItem(
           tabName = "save",
