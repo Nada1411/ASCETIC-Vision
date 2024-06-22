@@ -16,6 +16,7 @@ server <- function(input, output, session) {
   reshaped_data2 <- reactiveVal(NULL)
   rv <- reactiveValues(deletedColumns = character(0), deletedRows = character(0))
   app_activated <- reactiveVal(FALSE)
+  app_activated_surv <- reactiveVal(FALSE)
   nresampling <- reactiveVal(FALSE)
   nresampling_conf <- reactiveVal(FALSE)
   visualizeInferenceOutput <- reactiveVal(TRUE)
@@ -36,9 +37,14 @@ server <- function(input, output, session) {
       app_activated(TRUE)
     }
   })
+  observe({
+    if (!app_activated_surv()) {
+      app_activated_surv(TRUE)
+    }
+  })
   
   output$dataFile2_surv <- renderUI({
-    if (app_activated()) {
+    if (app_activated_surv()) {
       tagList(
         div(style = "align-items: center;", 
             fileInput("dataFile2_surv", 
@@ -174,6 +180,16 @@ server <- function(input, output, session) {
     conf_res(NULL)
     case(NULL)
     selected_folder(NULL)
+    output$combined_graph <- NULL
+    output$survPlot <- NULL
+    output$binarization_percSurv <- NULL
+    output$binarization_surv <- NULL
+    output$DeleteColumn_surv <- NULL
+    output$DeleteRow_surv <- NULL
+    updateCheckboxInput(session, "load_file", value = FALSE)
+    output$dataTable_GenotypeSurv <- NULL
+    output$dataTable_surv <- NULL
+    app_activated_surv(FALSE)
   }
   
   # Resets values when loading a new project
@@ -213,13 +229,6 @@ server <- function(input, output, session) {
     output$visualize_inference <- NULL
     output$visualize_conf <- NULL
     app_activated(FALSE)
-    output$binarization_percSurv <- NULL
-    output$binarization_surv <- NULL
-    output$DeleteColumn_surv <- NULL
-    output$DeleteRow_surv <- NULL
-    updateCheckboxInput(session, "load_file", value = FALSE)
-    output$dataTable_GenotypeSurv <- NULL
-    output$dataTable_surv <- NULL
   }
   
   # Resets values when submit btm in inference
@@ -1100,17 +1109,26 @@ server <- function(input, output, session) {
     } else {
       data2 <- read.table(inFile2$datapath, sep = "\t", header = TRUE, 
                           stringsAsFactors = FALSE)
-      
-      if (!"REF_COUNT" %in% colnames(data2)) {
-        showNotification("Select the correct resampling file", 
-                         type = "error")
-      } else {
-        reshaped_data2(data2)
-        output$dataTable2 <- renderDT({
-          datatable(data2, options = list(scrollX = TRUE), selection ="single")
-        })
+      if (colnames(data2)[1]=="SAMPLE" & colnames(data2)[2]=="GENE" &
+          colnames(data2)[3]=="REF_COUNT" & colnames(data2)[4]=="ALT_COUNT" &
+          colnames(data2)[5]=="COPY_NUMBER" & colnames(data2)[6]=="NORMAL_PLOIDY" &
+          colnames(data2)[7]=="VAF_ESTIMATE" & colnames(data2)[8]=="CCF_ESTIMATE") {
         
-        reshaped_data2(data2)
+        
+        if (!"REF_COUNT" %in% colnames(data2)) {
+          showNotification("Select the correct resampling file", 
+                           type = "error")
+        } else {
+          reshaped_data2(data2)
+          output$dataTable2 <- renderDT({
+            datatable(data2, options = list(scrollX = TRUE), selection ="single")
+          })
+          
+          reshaped_data2(data2)
+        }
+      } else {
+        showNotification("File not recognized. Make sure the column names are correct.", 
+                         type = "error")
       }
     }
   })
@@ -1129,36 +1147,43 @@ server <- function(input, output, session) {
       
       #### Bulk single biopsy
       if (ncol(data) == 3) {
-        default_values_load_new_genotype()
-        case("bulk_single")
-        data <- distinct(data, SAMPLE, GENE, .keep_all = TRUE)
-        reshaped_data(
-          acast(data, SAMPLE ~ GENE, value.var = "CCF", fill = 0)
-        )
-        
-        output$binarization <- renderUI({
-          tagList(
-            div(style = "display: flex; align-items: center;",
-                numericInput("binarization", 
-                             label = span("Filter to binarize ", 
-                                          tags$i(id = "helpIcon3", 
-                                                 class = "fa fa-question-circle", 
-                                                 style="margin-left: 5px;")), 
-                             value = 1, min = 0, max = 1, step = 0.01),
-                bsTooltip(id = "helpIcon3", 
-                          title = "Specify which threshold you want to use as a filter to binarize the database to be inputted into the next inference phase.", 
-                          placement = "right", trigger = "hover")
-            )
+        if (colnames(data)[1] =="SAMPLE" & colnames(data)[2] =="GENE" &
+            colnames(data)[3] =="CCF") {
+          default_values_load_new_genotype()
+          case("bulk_single")
+          data <- distinct(data, SAMPLE, GENE, .keep_all = TRUE)
+          reshaped_data(
+            acast(data, SAMPLE ~ GENE, value.var = "CCF", fill = 0)
           )
-        })
-        output$switchViewBtn <- renderUI({
-          actionButton("switchViewBtn", "Switch View", class = "custom-button")
-        })
-        
-        bulk_single_case()
+          
+          output$binarization <- renderUI({
+            tagList(
+              div(style = "display: flex; align-items: center;",
+                  numericInput("binarization", 
+                               label = span("Filter to binarize ", 
+                                            tags$i(id = "helpIcon3", 
+                                                   class = "fa fa-question-circle", 
+                                                   style="margin-left: 5px;")), 
+                               value = 1, min = 0, max = 1, step = 0.01),
+                  bsTooltip(id = "helpIcon3", 
+                            title = "Specify which threshold you want to use as a filter to binarize the database to be inputted into the next inference phase.", 
+                            placement = "right", trigger = "hover")
+              )
+            )
+          })
+          output$switchViewBtn <- renderUI({
+            actionButton("switchViewBtn", "Switch View", class = "custom-button")
+          })
+          
+          bulk_single_case()
+        } else {
+          showNotification("File not recognized. Make sure the column names are correct.", 
+                           type = "error")
+        }
         
       } else if (ncol(data) == 4) {   #### Bulk multipla biopsia o single cell 
-        if (colnames(data)[2]=="REGION") {
+        if (colnames(data)[1]=="SAMPLE" & colnames(data)[2]=="REGION" &
+            colnames(data)[3]=="GENE" & colnames(data)[4]=="CCF") {
           default_values_load_new_genotype()
           
           case("bulk_multiple")
@@ -1254,7 +1279,8 @@ server <- function(input, output, session) {
           shinyDirChoose(input, "dir", roots = c(wd = getwd()), 
                          filetypes = c("", "txt"))
           
-        } else if (colnames(data)[2]=="CELL") {
+        } else if (colnames(data)[1]=="PATIENT" & colnames(data)[2]=="CELL" &
+                    colnames(data)[3]=="GENE" & colnames(data)[4]=="VALUE") {
           default_values_load_new_genotype()
           case("single_cell")
           # Remove duplicates by keeping only the first occurrence for each position
@@ -1928,8 +1954,19 @@ server <- function(input, output, session) {
     } else {
       data <- read.table(inFile$datapath, sep = "\t", header = TRUE, 
                          stringsAsFactors = FALSE)
+      if (colnames(data)[1]=="SAMPLE" & colnames(data)[2]=="STATUS" &
+          colnames(data)[3]=="TIMES") {
       
-      surv_data(data)
+        surv_data(data)
+        
+        showNotification("File loaded successfully.",
+                         type = "message")
+        
+        
+      } else {
+        showNotification("File not recognized. Make sure the column names are correct.", 
+                         type = "error")
+      }
     }
   })
   
@@ -2195,10 +2232,11 @@ server <- function(input, output, session) {
         combined_df <- rbind(df_prev_long, df_risk_long)
         combined_df$Source <- factor(combined_df$Source, levels = c("Risk", "Prev"))
         
-        combined_df$Color <- ifelse(combined_df$Source == "Prev", "#FFC0CA", 
-                                    ifelse(combined_df$Cluster == "1", "#1A9E76", 
-                                           ifelse(combined_df$Cluster == "2", "#D95F02",
-                                                  ifelse(combined_df$Cluster == "3", "#766FB4", "#E8298C"))))
+        num_colors <- length(levels(combined_df$Cluster))  
+        colors_dark2 <- brewer.pal(num_colors, "Dark2")    
+        
+        combined_df$Color <- ifelse(combined_df$Source == "Prev", "#FFC0CA",  
+                                    colors_dark2[as.integer(combined_df$Cluster)]) 
         
         custom_labels <- function(x) {
           ifelse(x %% 1 == 0, as.character(x), as.character(x))
@@ -2264,7 +2302,6 @@ server <- function(input, output, session) {
           )
         )
 
-        
         return(p)
         
       })

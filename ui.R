@@ -373,7 +373,7 @@ shinyUI(
             ),
             div(style = "margin-top: 20px;"),
             fluidRow(
-                  plotlyOutput("survPlot", width = "100%", height = "350px"),
+                  plotlyOutput("survPlot", width = "100%", height = "400px"),
                   style = "width: 75%; margin: 0 auto;"
             )
           )
