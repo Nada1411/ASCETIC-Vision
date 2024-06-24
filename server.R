@@ -4,6 +4,7 @@ server <- function(input, output, session) {
   
   ############################ Variables  ######################################
   
+  #reactive var
   selected_folder <- reactiveVal(NULL)
   directory_output <- reactiveVal(NULL)
   reshaped_data <- reactiveVal(NULL)
@@ -45,6 +46,7 @@ server <- function(input, output, session) {
     }
   })
   
+  # Display the secondgenotype table entry in survival input phase if the app is active
   output$dataFile2_surv <- renderUI({
     if (app_activated_surv()) {
       tagList(
@@ -101,7 +103,6 @@ server <- function(input, output, session) {
     }
   })
   
-  
   # Regularization selectable in the confidence enstimation step are those that 
   # were used during the inference step
   observe({
@@ -127,7 +128,7 @@ server <- function(input, output, session) {
     }
   })
   
-  
+  # Binarization field constraint management in input survival phase
   observeEvent(input$binarization_surv, {
     x <- input$binarization_surv
     if ( !is.na(x) && (x > 1 || x < 0)){
@@ -136,7 +137,7 @@ server <- function(input, output, session) {
     }
   })
   
-  # Percentage binarization field constraint management
+  # Percentage binarization field constraint management in input survival phase
   observeEvent(input$binarization_percSurv, {
     x <- input$binarization_percSurv
     if ( !is.na(x) && (x > 1 || x < 0)){
@@ -280,6 +281,7 @@ server <- function(input, output, session) {
     return(heatmap_plot)
   }
   
+  # Visualization of deletion column and row in input survival phase
   visualize_del <- function() {
     output$DeleteColumn_surv <- render_delete_column_ui("DeleteColumn_surv", 
                                                         "Delete column", 
@@ -287,6 +289,24 @@ server <- function(input, output, session) {
     output$DeleteRow_surv <- render_delete_row_ui("DeleteRow_surv", 
                                                   "Delete row", 
                                                   reshaped_dataSurv())
+  }
+  
+  # Function to render UI for deleting columns
+  render_delete_column_ui <- function(input_id, label, data, selected_columns = NULL) {
+    output <- renderUI({
+      selectInput(input_id, label, choices = colnames(data), 
+                  selected = selected_columns, multiple = TRUE)
+    })
+    return(output)
+  }
+  
+  # Function to render UI for deleting rows
+  render_delete_row_ui <- function(input_id, label, data, selected_rows = NULL) {
+    output <- renderUI({
+      selectInput(input_id, label, choices = rownames(data), 
+                  selected = selected_rows, multiple = TRUE)
+    })
+    return(output)
   }
   
   # Management click on genotype table and visualization of POSET
@@ -336,15 +356,6 @@ server <- function(input, output, session) {
       }
     })
   }
-  
-  observe({
-    value <- resampling_res()
-    if (is.null(value)) {
-      updateSelectInput(session, "regularization_surv", choices = list())
-    } else {
-      updateSelectInput(session, "regularization_surv", choices = names(value$inference), selected = reg_sel())
-    }
-  })
   
   # Selection/deletion of row and column
   modify_reshaped_data <- function(reshaped_data) {
@@ -780,6 +791,162 @@ server <- function(input, output, session) {
     write.csv(data, name, row.names=TRUE)
   }
   
+  # Binarize scond genotype file in input survival phase
+  binarize_table_surv <- function(filter, filter_perc, reshaped_data) {
+    genotype_table_surv(reshaped_data)
+    if(is.na(filter)) {
+      showNotification("Enter a valid value in the binarization field", type = "error")
+    }
+    else if (is.null(case_surv()) || case_surv() != "bulk_multiple") {
+      #filter the genotype_table_surv table
+      genotype_table_surv(ifelse(genotype_table_surv() >= filter, 1, 0))
+    }
+    else if (case_surv() == "bulk_multiple") {
+      genotype_table_surv(ifelse(genotype_table_surv() >= filter, 1, 0))
+      
+      df <- as.data.frame(genotype_table_surv())
+      
+      df <- df %>%
+        mutate(id = sapply(strsplit(row.names(df), "\t"), `[`, 1))
+      
+      result <- df %>%
+        group_by(id) %>%
+        summarize(across(everything(), ~mean(. != 0)))
+      
+      result <- result %>%
+        column_to_rownames(var = "id")
+      
+      genotype_table_surv(ifelse(result >= filter_perc, 1, 0))
+    }
+  }
+  
+  # Delete column or row of genotype file in input survival phase
+  modify_reshaped_dataSurv <- function(reshaped_data) {
+    reshaped_data_df <- as.data.frame(reshaped_data)  # Conversione in data.frame
+    
+    if (!is.null(input$DeleteColumn_surv) && length(input$DeleteColumn_surv) > 0) {
+      cols_to_delete <- unlist(strsplit(input$DeleteColumn_surv, ",\\s*"))
+      if (any(input$DeleteColumn_surv %in% colnames(reshaped_data_df))) {
+        reshaped_data_df <- reshaped_data_df[, !colnames(reshaped_data_df) 
+                                             %in% input$DeleteColumn_surv, drop = FALSE]
+      }
+    }
+    
+    if (!is.null(input$DeleteRow_surv) && length(input$DeleteRow_surv) > 0) {
+      rows_to_delete <- as.numeric(unlist(strsplit(input$DeleteRow_surv, ",\\s*")))
+      if (any(input$DeleteRow_surv %in% rownames(reshaped_data_df)) || 
+          any(as.numeric(input$DeleteRow_surv) %in% 1:nrow(reshaped_data_df))) {
+        reshaped_data_df <- reshaped_data_df[!rownames(reshaped_data_df) 
+                                             %in% input$DeleteRow_surv, , drop = FALSE]
+      }
+    }
+    
+    return(reshaped_data_df)
+  }
+  
+  # Visualize survival output (risk-prev and kaplan-meier)
+  visualize_output_surv <- function(resExampleEvosigs) {
+    output$combined_graph <- renderGirafe({
+      df_prev <- resExampleEvosigs$clustersPrevalence
+      if (!is.data.frame(df_prev)) {
+        df_prev <- as.data.frame(df_prev)
+      }
+      df_prev$Cluster <- factor(1:nrow(df_prev))
+      names(df_prev) <- gsub(".to.", " > ", names(df_prev))
+      df_prev_long <- melt(df_prev, id.vars = "Cluster", variable.name = "GenePair", value.name = "Prevalence")
+      df_prev_long$Source <- "Prev"
+      
+      result <- resExampleEvosigs$clustersPrevalence
+      for (col in colnames(result)) {
+        if (col %in% names(resExampleEvosigs$evolutionarySteps)) {
+          result[, col] <- ifelse(result[, col] != 0, 
+                                  resExampleEvosigs$evolutionarySteps[col], 0)
+        }
+      }
+      df_risk <- as.data.frame(result)
+      df_risk$Cluster <- factor(1:nrow(df_risk))
+      names(df_risk) <- gsub(".to.", " > ", names(df_risk))
+      df_risk_long <- melt(df_risk, id.vars = "Cluster", variable.name = "GenePair", value.name = "Prevalence")
+      df_risk_long$Source <- "Risk"
+      
+      combined_df <- rbind(df_prev_long, df_risk_long)
+      combined_df$Source <- factor(combined_df$Source, levels = c("Risk", "Prev"))
+      
+      num_colors <- length(levels(combined_df$Cluster))  
+      colors_dark2 <- brewer.pal(num_colors, "Dark2")    
+      
+      combined_df$Color <- ifelse(combined_df$Source == "Prev", "#FFC0CA",  
+                                  colors_dark2[as.integer(combined_df$Cluster)]) 
+      
+      custom_labels <- function(x) {
+        ifelse(x %% 1 == 0, as.character(x), as.character(x))
+      }
+      
+      p <- ggplot(data = combined_df, aes(x = Prevalence, y = GenePair, fill = Color, tooltip = Prevalence, data_id = GenePair)) +
+        geom_bar_interactive(stat = "identity", position = position_dodge(width = 0.5), width = 0.4, hover_css = "fill: black;") +
+        facet_wrap(~ Cluster + Source, scales = "free_x", nrow = 1, strip.position = "top") +
+        scale_fill_identity() +
+        scale_x_continuous(breaks = seq(-1, 1, by = 0.5), labels = custom_labels) +
+        theme_minimal() +
+        theme(
+          axis.title = element_blank(),
+          axis.text.y = element_text(angle = 0, vjust = 0.5, size = 6),
+          axis.text.x = element_text(angle = 0, hjust = 0.5, size = 6),
+          legend.position = "none",
+          strip.text.x = element_text(angle = 0, hjust = 0.5, size = 6),
+          strip.text.y = element_text(angle = 0, hjust = 0.5, size = 6),
+          plot.title = element_text(hjust = 0.4, size = 9),  
+          panel.background = element_rect(fill = alpha("grey90", 0.5), color = NA),  
+          panel.grid.major = element_line(color = "white")
+        ) +
+        labs(y = "", x = "Prevalence", title = "Evolutionary Signatures")
+      
+      girafe(ggobj = p)
+    })
+    
+    new_df <- reactive({
+      times <- resExampleEvosigs$survivalAnalysis$data$times
+      status <- resExampleEvosigs$survivalAnalysis$data$status
+      clusters <- resExampleEvosigs$survivalAnalysis$clusters
+      df <- data.frame(times = times, status = status, clusters = clusters)
+      rownames(df) <- rownames(resExampleEvosigs$survivalAnalysis$data)
+      df
+    })
+    
+    
+    output$survPlot <- renderPlotly({
+      df <- new_df()  
+      fit <- survfit(Surv(times, status) ~ clusters, data = df)
+      
+      g <- ggsurvplot(fit, data = df, risk.table = FALSE,
+                      title = "Survival Probability",
+                      palette = "Dark2", legend.title = "Legend",
+                      ggtheme = theme_minimal(),
+                      censor = FALSE, pval = FALSE)  
+      
+      p <- ggplotly(g$plot)
+      
+      p <- p %>% layout(
+        title = list(text = "Survival Probability", font = list(size = 17), x = 0.5, xanchor = "center" ),
+        legend = list(orientation = "h", x = 0.5, xanchor = "center", y = 1.05),
+        annotations = list(
+          list(
+            text = "p<0.0001",
+            x = 0.05,  
+            xref = "paper",
+            y = 0.25,  
+            yref = "paper",
+            showarrow = FALSE,
+            font = list(size = 12)
+          )
+        )
+      )
+      
+      return(p)
+      
+    })
+  }
+  
   # Link to external db
   observe({
     if (!is.null(input$graph_inference_selected)&&input$graph_inference_selected!="") {
@@ -820,7 +987,14 @@ server <- function(input, output, session) {
     }
   })
   
-  
+  observe({
+    value <- resampling_res()
+    if (is.null(value)) {
+      updateSelectInput(session, "regularization_surv", choices = list())
+    } else {
+      updateSelectInput(session, "regularization_surv", choices = names(value$inference), selected = reg_sel())
+    }
+  })
   
   ############################ Load or create project  ###########################
   
@@ -869,7 +1043,6 @@ server <- function(input, output, session) {
   })
   
   ##Load
-  
   
   observeEvent(input$loadProjBtn, {
     buttonClicked(TRUE) 
@@ -1178,24 +1351,6 @@ server <- function(input, output, session) {
       })
     }
   })
-  
-  # Function to render UI for deleting columns
-  render_delete_column_ui <- function(input_id, label, data, selected_columns = NULL) {
-    output <- renderUI({
-      selectInput(input_id, label, choices = colnames(data), 
-                  selected = selected_columns, multiple = TRUE)
-    })
-    return(output)
-  }
-  
-  # Function to render UI for deleting rows
-  render_delete_row_ui <- function(input_id, label, data, selected_rows = NULL) {
-    output <- renderUI({
-      selectInput(input_id, label, choices = rownames(data), 
-                  selected = selected_rows, multiple = TRUE)
-    })
-    return(output)
-  }
   
   ############################ Input data  #######################################
   
@@ -1727,7 +1882,6 @@ server <- function(input, output, session) {
       }
       
       if (input$visualize_inference == "rankingEstimate") {
-        
         output$graph_inference <- NULL
         selected_result[, "variable"] <- row.names(selected_result)
         selected_result[, "rank"] <- as.integer(selected_result[, "rank"]) + 1
@@ -1786,7 +1940,6 @@ server <- function(input, output, session) {
       showNotification("Fill in all fields", type = "error")
     }
     else{
-      
       if(case()=="bulk_single") {
         if(input$resamplingFlag_conf == FALSE) {
           res <- asceticCCFAssessment(
@@ -1936,6 +2089,7 @@ server <- function(input, output, session) {
   
   ############################ Input survival  #################################
   
+  # Calculate evolutionary step table
   observeEvent(input$submit_surv, {
     if (is.null(conf_res())) {
       showNotification("Perform the confidence phase first", type = "message")
@@ -1952,6 +2106,7 @@ server <- function(input, output, session) {
       
       positions_one <- which(matrix == 1, arr.ind = TRUE)
       
+      # Identification of pairs in the selected graph through the regularizer
       pairs <- data.frame(
         Genes = apply(positions_one, 1, 
                       function(idx) paste(rownames(matrix)[idx[1]], 
@@ -1984,28 +2139,22 @@ server <- function(input, output, session) {
         pairs <- rbind(pairs, new_pairs)
         pairs <- unique(pairs)
         
+        # Management of the second genotype file if it has been uploaded by the user
         if (input$load_file) {
-          
             filter_value <- input$binarization_surv
             filter_perc <- input$binarization_percSurv
-            
 
             binarize_table_surv(filter_value, filter_perc, reshaped_dataSurv())
 
             mutation_db <- genotype_table_surv()
-            
-            
         } else {
-          
           filter_value <- input$binarization
           filter_perc <- input$binarization_perc
-          
           
           binarize_table(filter_value, filter_perc, reshaped_data_matrix())
           mutation_db <- genotype_table()
         }
-        
-        
+
         output_db <- matrix(0, nrow = nrow(mutation_db), ncol = length(pairs$Genes), 
                             dimnames = list(rownames(mutation_db), pairs$Genes))
   
@@ -2025,16 +2174,14 @@ server <- function(input, output, session) {
             }
           }
         }
-      
-        
+
         surv_data <- surv_data()
         common_samples <- intersect(rownames(output_db), surv_data$SAMPLE)
         
         output_db <- output_db[rownames(output_db) %in% common_samples, ]
         surv_data <- surv_data[surv_data$SAMPLE %in% common_samples, ]
         surv_data(surv_data)
-        
-        
+
         # Checking for all-zero or all-one columns
         all_zero_one <- apply(output_db, 2, function(col) all(col == 0) || all(col == 1))
         if (any(all_zero_one)) {
@@ -2043,8 +2190,7 @@ server <- function(input, output, session) {
                                  "have been removed"), type = "message")
           output_db <- output_db[, !all_zero_one]
         }
-        
-  
+
         output$dataTable_surv <- renderDT({
           datatable(output_db, options = list(scrollX = TRUE), 
                     selection = "single")
@@ -2057,6 +2203,7 @@ server <- function(input, output, session) {
     }
   })
   
+  # Load survival file
   observeEvent(input$loadBtn2_surv, {
     inFile <- input$dataFile2_surv
     
@@ -2067,13 +2214,9 @@ server <- function(input, output, session) {
                          stringsAsFactors = FALSE)
       if (colnames(data)[1]=="SAMPLE" & colnames(data)[2]=="STATUS" &
           colnames(data)[3]=="TIMES") {
-      
         surv_data(data)
-        
         showNotification("File loaded successfully.",
                          type = "message")
-        
-        
       } else {
         showNotification("File not recognized. Make sure the column names are correct.", 
                          type = "error")
@@ -2081,6 +2224,7 @@ server <- function(input, output, session) {
     }
   })
   
+  # Load the second genotype file
   observeEvent(input$loadBtn_surv, {
     inFile2 <- input$dataFile_surv
     output$dataTable_surv <- NULL
@@ -2120,11 +2264,8 @@ server <- function(input, output, session) {
               )
             )
           })
-          
           output$binarization_percSurv <- NULL
-          
           visualize_del()
-          
           orig_genotypeSurv(reshaped_dataSurv())
         } else{
           showNotification("File not recognized. Make sure the column names are correct.", 
@@ -2167,7 +2308,6 @@ server <- function(input, output, session) {
             )
           })
           
-          
           output$binarization_percSurv <- renderUI({
             tagList(
               div(style = "display: flex; align-items: center;",
@@ -2183,9 +2323,7 @@ server <- function(input, output, session) {
               )
             )
           })
-          
           visualize_del()
-          
           orig_genotypeSurv(reshaped_dataSurv())
         }
         else if (colnames(data)[1]=="PATIENT" & colnames(data)[2]=="CELL" &
@@ -2221,13 +2359,9 @@ server <- function(input, output, session) {
               )
             )
           })
-          
           output$binarization_percSurv <- NULL
-          
           visualize_del()
-          
           orig_genotypeSurv(reshaped_dataSurv())
-          
         } else {
           showNotification("File not recognized. Make sure the column names are correct.", 
                            type = "error")
@@ -2235,61 +2369,6 @@ server <- function(input, output, session) {
       }
     }
   })
-  
-  binarize_table_surv <- function(filter, filter_perc, reshaped_data) {
-    genotype_table_surv(reshaped_data)
-    if(is.na(filter)) {
-      showNotification("Enter a valid value in the binarization field", type = "error")
-    }
-    else if (is.null(case_surv()) || case_surv() != "bulk_multiple") {
-      #filter the genotype_table_surv table
-      genotype_table_surv(ifelse(genotype_table_surv() >= filter, 1, 0))
-    }
-    else if (case_surv() == "bulk_multiple") {
-      genotype_table_surv(ifelse(genotype_table_surv() >= filter, 1, 0))
-      
-      df <- as.data.frame(genotype_table_surv())
-      
-      df <- df %>%
-        mutate(id = sapply(strsplit(row.names(df), "\t"), `[`, 1))
-      
-      result <- df %>%
-        group_by(id) %>%
-        summarize(across(everything(), ~mean(. != 0)))
-
-      result <- result %>%
-        column_to_rownames(var = "id")
-
-      genotype_table_surv(ifelse(result >= filter_perc, 1, 0))
-      
-      
-      
-      
-    }
-  }
-  
-  modify_reshaped_dataSurv <- function(reshaped_data) {
-    reshaped_data_df <- as.data.frame(reshaped_data)  # Conversione in data.frame
-    
-    if (!is.null(input$DeleteColumn_surv) && length(input$DeleteColumn_surv) > 0) {
-      cols_to_delete <- unlist(strsplit(input$DeleteColumn_surv, ",\\s*"))
-      if (any(input$DeleteColumn_surv %in% colnames(reshaped_data_df))) {
-        reshaped_data_df <- reshaped_data_df[, !colnames(reshaped_data_df) 
-                                             %in% input$DeleteColumn_surv, drop = FALSE]
-      }
-    }
-
-    if (!is.null(input$DeleteRow_surv) && length(input$DeleteRow_surv) > 0) {
-      rows_to_delete <- as.numeric(unlist(strsplit(input$DeleteRow_surv, ",\\s*")))
-      if (any(input$DeleteRow_surv %in% rownames(reshaped_data_df)) || 
-          any(as.numeric(input$DeleteRow_surv) %in% 1:nrow(reshaped_data_df))) {
-        reshaped_data_df <- reshaped_data_df[!rownames(reshaped_data_df) 
-                                             %in% input$DeleteRow_surv, , drop = FALSE]
-      }
-    }
-    
-    return(reshaped_data_df)
-  }
   
   observe({
     req(reshaped_dataSurv())  
@@ -2301,19 +2380,17 @@ server <- function(input, output, session) {
     })
     updateTextInput(session, "DeleteColumn_surv", value = input$DeleteColumn_surv)
     updateTextInput(session, "DeleteRow_surv", value = input$DeleteRow_surv)
-    
-    
   })
   
-  # Rendering della DataTable
+  # Rendering second genotype table in input survival phase
   output$dataTable_GenotypeSurv <- renderDT({
     req(reshaped_dataSurv())  # Assicura la presenza di dati
     datatable(reshaped_dataSurv(), options = list(scrollX = TRUE))
   })
-  
-  
+
   ############################ Output survival  #################################
   
+  # Calculation of survival output using ASCETIC function 'evoSigs'
   observeEvent(input$calc_surv, {
     if(is.null(evo_step())) {
       showNotification("Calculate the evolutionary step first", type = "message")
@@ -2333,107 +2410,6 @@ server <- function(input, output, session) {
     }
   })
 
-  visualize_output_surv <- function(resExampleEvosigs) {
-    output$combined_graph <- renderGirafe({
-      df_prev <- resExampleEvosigs$clustersPrevalence
-      if (!is.data.frame(df_prev)) {
-        df_prev <- as.data.frame(df_prev)
-      }
-      df_prev$Cluster <- factor(1:nrow(df_prev))
-      names(df_prev) <- gsub(".to.", " > ", names(df_prev))
-      df_prev_long <- melt(df_prev, id.vars = "Cluster", variable.name = "GenePair", value.name = "Prevalence")
-      df_prev_long$Source <- "Prev"
-      
-      result <- resExampleEvosigs$clustersPrevalence
-      for (col in colnames(result)) {
-        if (col %in% names(resExampleEvosigs$evolutionarySteps)) {
-          result[, col] <- ifelse(result[, col] != 0, 
-                                  resExampleEvosigs$evolutionarySteps[col], 0)
-        }
-      }
-      df_risk <- as.data.frame(result)
-      df_risk$Cluster <- factor(1:nrow(df_risk))
-      names(df_risk) <- gsub(".to.", " > ", names(df_risk))
-      df_risk_long <- melt(df_risk, id.vars = "Cluster", variable.name = "GenePair", value.name = "Prevalence")
-      df_risk_long$Source <- "Risk"
-      
-      combined_df <- rbind(df_prev_long, df_risk_long)
-      combined_df$Source <- factor(combined_df$Source, levels = c("Risk", "Prev"))
-      
-      num_colors <- length(levels(combined_df$Cluster))  
-      colors_dark2 <- brewer.pal(num_colors, "Dark2")    
-      
-      combined_df$Color <- ifelse(combined_df$Source == "Prev", "#FFC0CA",  
-                                  colors_dark2[as.integer(combined_df$Cluster)]) 
-      
-      custom_labels <- function(x) {
-        ifelse(x %% 1 == 0, as.character(x), as.character(x))
-      }
-      
-      p <- ggplot(data = combined_df, aes(x = Prevalence, y = GenePair, fill = Color, tooltip = Prevalence, data_id = GenePair)) +
-        geom_bar_interactive(stat = "identity", position = position_dodge(width = 0.5), width = 0.4, hover_css = "fill: black;") +
-        facet_wrap(~ Cluster + Source, scales = "free_x", nrow = 1, strip.position = "top") +
-        scale_fill_identity() +
-        scale_x_continuous(breaks = seq(-1, 1, by = 0.5), labels = custom_labels) +
-        theme_minimal() +
-        theme(
-          axis.title = element_blank(),
-          axis.text.y = element_text(angle = 0, vjust = 0.5, size = 6),
-          axis.text.x = element_text(angle = 0, hjust = 0.5, size = 6),
-          legend.position = "none",
-          strip.text.x = element_text(angle = 0, hjust = 0.5, size = 6),
-          strip.text.y = element_text(angle = 0, hjust = 0.5, size = 6),
-          plot.title = element_text(hjust = 0.4, size = 9),  
-          panel.background = element_rect(fill = alpha("grey90", 0.5), color = NA),  
-          panel.grid.major = element_line(color = "white")
-        ) +
-        labs(y = "", x = "Prevalence", title = "Evolutionary Signatures")
-      
-      girafe(ggobj = p)
-    })
-    
-    new_df <- reactive({
-      times <- resExampleEvosigs$survivalAnalysis$data$times
-      status <- resExampleEvosigs$survivalAnalysis$data$status
-      clusters <- resExampleEvosigs$survivalAnalysis$clusters
-      df <- data.frame(times = times, status = status, clusters = clusters)
-      rownames(df) <- rownames(resExampleEvosigs$survivalAnalysis$data)
-      df
-    })
-    
-    
-    output$survPlot <- renderPlotly({
-      df <- new_df()  
-      fit <- survfit(Surv(times, status) ~ clusters, data = df)
-      
-      g <- ggsurvplot(fit, data = df, risk.table = FALSE,
-                      title = "Survival Probability",
-                      palette = "Dark2", legend.title = "Legend",
-                      ggtheme = theme_minimal(),
-                      censor = FALSE, pval = FALSE)  
-      
-      p <- ggplotly(g$plot)
-      
-      p <- p %>% layout(
-        title = list(text = "Survival Probability", font = list(size = 17), x = 0.5, xanchor = "center" ),
-        legend = list(orientation = "h", x = 0.5, xanchor = "center", y = 1.05),
-        annotations = list(
-          list(
-            text = "p<0.0001",
-            x = 0.05,  
-            xref = "paper",
-            y = 0.25,  
-            yref = "paper",
-            showarrow = FALSE,
-            font = list(size = 12)
-          )
-        )
-      )
-      
-      return(p)
-      
-    })
-  }
   ############################ Save project  ################################# 
   
   observe({

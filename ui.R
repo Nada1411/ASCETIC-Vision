@@ -224,7 +224,6 @@ shinyUI(
                 ),
               ),
             ),
-            
             tags$div(style = "height: 40px;"),
             conditionalPanel(
               condition = "output.graph_inference",
@@ -296,7 +295,6 @@ shinyUI(
                 ),
               ),
             ),
-            
             tags$div(style = "height: 40px;"),
             conditionalPanel(
               condition = "output.graph_conf",
