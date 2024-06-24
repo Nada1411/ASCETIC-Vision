@@ -27,9 +27,11 @@ server <- function(input, output, session) {
   buttonClicked <- reactiveVal(FALSE)
   reshaped_dataSurv <- reactiveVal(NULL)
   genotype_table_surv <- reactiveVal(FALSE)
-  orig_genotypeSurv <- reactiveVal(FALSE)
+  orig_genotypeSurv <- reactiveVal(NULL)
   surv_data <- reactiveVal(NULL)
   evo_step <- reactiveVal(NULL)
+  reg_sel <- reactiveVal(NULL)
+  resExampleEvosigs <- reactiveVal(NULL)
   
   # Active app
   observe({
@@ -179,6 +181,7 @@ server <- function(input, output, session) {
     resampling_res(NULL)
     conf_res(NULL)
     case(NULL)
+    case_surv(NULL)
     selected_folder(NULL)
     output$combined_graph <- NULL
     output$survPlot <- NULL
@@ -190,6 +193,7 @@ server <- function(input, output, session) {
     output$dataTable_GenotypeSurv <- NULL
     output$dataTable_surv <- NULL
     app_activated_surv(FALSE)
+    conf_res(NULL)
   }
   
   # Resets values when loading a new project
@@ -238,8 +242,10 @@ server <- function(input, output, session) {
     output$selected_result_output_conf <- renderDataTable(NULL)
     output$selected_result_output <- renderDataTable(NULL)
     output$visualize_inference <- renderUI(NULL)
+    output$visualize_conf <- renderUI(NULL)
     visualizeInferenceOutput(FALSE)
     visualizeConfidenceOutput(FALSE)
+    resampling_res(NULL)
   }
   
   # Returns the list of project names in the output_project folder
@@ -272,6 +278,15 @@ server <- function(input, output, session) {
       layout(dragmode = "select")
     
     return(heatmap_plot)
+  }
+  
+  visualize_del <- function() {
+    output$DeleteColumn_surv <- render_delete_column_ui("DeleteColumn_surv", 
+                                                        "Delete column", 
+                                                        reshaped_dataSurv())
+    output$DeleteRow_surv <- render_delete_row_ui("DeleteRow_surv", 
+                                                  "Delete row", 
+                                                  reshaped_dataSurv())
   }
   
   # Management click on genotype table and visualization of POSET
@@ -327,7 +342,7 @@ server <- function(input, output, session) {
     if (is.null(value)) {
       updateSelectInput(session, "regularization_surv", choices = list())
     } else {
-      updateSelectInput(session, "regularization_surv", choices = names(value$inference))
+      updateSelectInput(session, "regularization_surv", choices = names(value$inference), selected = reg_sel())
     }
   })
   
@@ -805,6 +820,8 @@ server <- function(input, output, session) {
     }
   })
   
+  
+  
   ############################ Load or create project  ###########################
   
   ##Create
@@ -958,6 +975,28 @@ server <- function(input, output, session) {
                 }
                 
               }
+              else if (file_name == "genotipo_surv") {
+                data <- read.csv(file_directory, row.names = 1)
+                data <- as.matrix(data)
+                orig_genotypeSurv(data)
+                reshaped_dataSurv(data)
+                output$dataTable_GenotypeSurv <- renderDT({
+                  datatable(data, options = list(scrollX = TRUE))
+                })
+              }
+              else if (file_name == "surv_data") {
+                data_surv <- read.csv(file_directory, row.names = 1)
+                data_surv <- data.frame(data_surv)
+                surv_data(data_surv)
+              }
+              else if (file_name == "evo_step") {
+                data <- read.csv(file_directory, row.names = 1)
+                data_evo <- as.matrix(data)
+                evo_step(data)
+                output$dataTable_surv <- renderDT({
+                  datatable(data_evo, options = list(scrollX = TRUE))
+                })
+              }
               else if (file_name == "parameters") {
                 parameters <- read.csv(file_directory)
                 
@@ -968,7 +1007,7 @@ server <- function(input, output, session) {
                   
                   # Assigns the value to the corresponding input
                   if (parametro == "binarization") {
-                    val_bin <- as.numeric(value)
+                    binarization <- as.numeric(value)
                     output$binarization <- renderUI({
                       tagList(
                         div(style = "display: flex; align-items: center;",
@@ -977,7 +1016,7 @@ server <- function(input, output, session) {
                                                       tags$i(id = "helpIcon3", 
                                                              class = "fa fa-question-circle", 
                                                              style="margin-left: 5px;")), 
-                                         value = val_bin, min = 0, max = 1, 
+                                         value = binarization, min = 0, max = 1, 
                                          step = 0.01),
                             bsTooltip(id = "helpIcon3", 
                                       title = "Specify which threshold you want to use as a filter to binarize the database to be inputted into the next inference phase.", 
@@ -988,24 +1027,25 @@ server <- function(input, output, session) {
                   }
                   else if (parametro =="del_col") {
                     vettore <- unlist(strsplit(gsub("\"", "", value), ",\\s*"))
-                    del_col <- vettore[vettore != ""]
+                    del_col_inf <- vettore[vettore != ""]
                     output$DeleteColumn <- render_delete_column_ui("DeleteColumn", 
                                                                    "Delete column", 
                                                                    reshaped_data(),
-                                                                   selected_columns = del_col)
+                                                                   selected_columns = del_col_inf)
                     
                   }else if (parametro =="del_row") {
                     vettore <- unlist(strsplit(gsub("\"", "", value), ",\\s*"))
-                    del_row <- vettore[vettore != ""]
+                    del_row_inf <- vettore[vettore != ""]
                     output$DeleteRow <- render_delete_row_ui("DeleteRow", 
                                                              "Delete row", 
                                                              reshaped_data(),
-                                                             selected_rows = del_row)
+                                                             selected_rows = del_row_inf)
                   }else if (parametro == "flag_resampling") {
                     updateCheckboxInput(session, "resamplingFlag", 
                                         value = as.logical(value))
                   } else if (parametro == "nresampling") {
                     nresampling(as.numeric(value))
+                    print(value)
                     updateNumericInput(session, "nresampling", 
                                        value = as.numeric(value))
                   } else if (parametro == "restarts") {
@@ -1030,6 +1070,64 @@ server <- function(input, output, session) {
                     nresampling_conf(as.numeric(value))
                     updateNumericInput(session, "nresampling_conf", 
                                        value = as.numeric(value))
+                  } else if (parametro == "reg_surv") {
+                    reg_sel(value)
+                  } else if (parametro == "flag_surv") {
+                    updateCheckboxInput(session, "load_file", 
+                                        value = as.logical(value))
+                  } else if (parametro == "binarization_surv" & !(is.na(value))){
+                    binarization_surv <- as.numeric(value)
+                    output$binarization_surv <- renderUI({
+                      tagList(
+                        div(style = "display: flex; align-items: center;",
+                            numericInput("binarization_surv", 
+                                         label = span("Filter to binarize ", 
+                                                      tags$i(id = "helpIcon3", 
+                                                             class = "fa fa-question-circle", 
+                                                             style="margin-left: 5px;")), 
+                                         value = binarization_surv, min = 0, max = 1, 
+                                         step = 0.01),
+                            bsTooltip(id = "helpIcon3", 
+                                      title = "Specify which threshold you want to use as a filter to binarize the database to be inputted into the next inference phase.", 
+                                      placement = "right", trigger = "hover")
+                        )
+                      )
+                    })
+                  }
+                  else if (parametro =="del_col_surv" & !(is.na(value))) {
+                    vettore <- unlist(strsplit(gsub("\"", "", value), ",\\s*"))
+                    del_col <- vettore[vettore != ""]
+                    output$DeleteColumn_surv <- render_delete_column_ui("DeleteColumn_surv", 
+                                                                   "Delete column", 
+                                                                   orig_genotypeSurv(),
+                                                                   selected_columns = del_col)
+                    
+                  }else if (parametro =="del_row_surv" & !(is.na(value))) {
+                    vettore <- unlist(strsplit(gsub("\"", "", value), ",\\s*"))
+                    del_row <- vettore[vettore != ""]
+                    output$DeleteRow_surv <- render_delete_row_ui("DeleteRow_surv", 
+                                                             "Delete row", 
+                                                             orig_genotypeSurv(),
+                                                             selected_rows = del_row)
+                  } else if (parametro == "binarizationPerc_surv" & !(is.na(value))) {
+                    binarizationPerc_surv <- as.numeric(value)
+                    output$binarization_percSurv <- renderUI({
+                      tagList(
+                        div(style = "display: flex; align-items: center;",
+                            numericInput("binarization_percSurv", 
+                                         label = span("Filter to binarize ", 
+                                                      tags$i(id = "helpIcon3", 
+                                                             class = "fa fa-question-circle", 
+                                                             style="margin-left: 5px;")), 
+                                         value = binarizationPerc_surv, min = 0, max = 1, 
+                                         step = 0.01),
+                            bsTooltip(id = "helpIcon3", 
+                                      title = "Specify which threshold you want to use as a filter to binarize the database to be inputted into the next inference phase.", 
+                                      placement = "right", trigger = "hover")
+                        )
+                      )
+                    })
+                    case_surv("bulk_multiple")
                   }
                 }
               }
@@ -1046,7 +1144,11 @@ server <- function(input, output, session) {
                               c(names),
                               selected = "poset")  
                 })
-              }else if (file_name == "confidence_res") {
+              }else if (file_name == "resExampleEvosigs") {
+                resExampleEvosigs(readRDS(file_directory))
+                visualize_output_surv(resExampleEvosigs())
+              }
+              else if (file_name == "confidence_res") {
                 conf_res(readRDS(file_directory))
                 res <- conf_res()
                 names_to_remove <- c("dataset", "models", "ccfDataset", "inference")
@@ -1404,7 +1506,7 @@ server <- function(input, output, session) {
   observeEvent(input$submitBtn, {
     default_values_inference()
     filter <- input$binarization
-    filter_perc <- input$binarization_percSurv
+    filter_perc <- input$binarization_perc
 
     
     # filter the genotype table according to the case
@@ -1590,11 +1692,11 @@ server <- function(input, output, session) {
                                !is.null(reshaped_data2()))) {
         if (!is.null(nresampling())) {
           output$nresampling <- renderUI({
-            numericInput("nresampling", "Number of samplings", nresampling(), min = 3)
+            numericInput("nresampling", "Number of samplings", value = nresampling(), min = 3)
           })
         } else {
           output$nresampling <- renderUI({
-            numericInput("nresampling", "Number of samplings", 3, min = 3)
+            numericInput("nresampling", "Number of samplings", value = 3, min = 3)
           })
         }
       } else {
@@ -1745,9 +1847,9 @@ server <- function(input, output, session) {
       } else {
         selected_result <- res$inference[[input$visualize_conf]]
       }
-      
-      if (input$visualize_conf == "ranking") {
+      if (input$visualize_conf == "rankingEstimate" | input$visualize_conf == "ranking") {
         output$graph_conf <- NULL
+        selected_result <- res[["ranking"]]
         ranking_df <- as.data.frame(selected_result)
         ranking_df <- data.frame(genes = rownames(ranking_df), 
                                  rank = ranking_df$selected_result)
@@ -1810,11 +1912,12 @@ server <- function(input, output, session) {
         if (!is.null(nresampling_conf())) {
           output$nresampling_conf <- renderUI({
             numericInput("nresampling_conf", "Number of samplings", 
-                         nresampling_conf(), min = 3)
+                         value = 3, min = 3)
           })
         } else {
           output$nresampling_conf <- renderUI({
-            numericInput("nresampling_conf", "Number of samplings", 3, min = 3)
+            numericInput("nresampling_conf", "Number of samplings", 
+                         value = 3, min = 3)
           })
         }
       } else {
@@ -1840,6 +1943,8 @@ server <- function(input, output, session) {
         showNotification("Please select a genotype file", type = "error")
     } else if (is.null(surv_data())) {
       showNotification("Please upload survival file", type = "error")
+    } else if (is.null(input$regularization_surv)){
+      showNotification("Please select a regularization value", type = "error")
     } else {
       result <- conf_res()
       regularization <- input$regularization_surv
@@ -1855,94 +1960,100 @@ server <- function(input, output, session) {
         stringsAsFactors = FALSE
       )
       
-      targets <- sapply(strsplit(pairs$Genes, "\\.to\\."), function(x) x[2])
-      
-      incoming_edges <- colSums(matrix[, targets] > 0)
-      
-      genes_no_incoming <- names(incoming_edges[incoming_edges == 0])
-      
-      pairs$Genes <- ifelse(targets %in% genes_no_incoming, 
-                            paste("Root.to", targets, sep = "."),
-                            pairs$Genes)
-      
-      split_names <- strsplit(pairs$Genes, "\\.to\\.")
-      sources <- sapply(split_names, `[`, 1)
-      destinations <- sapply(split_names, `[`, 2)
-      
-      sources_no_destination <- sources[!sources %in% destinations]
-      
-      root_entries <- paste("Root.to", sources_no_destination, sep = ".")
-      
-      new_pairs <- data.frame(Genes = root_entries, stringsAsFactors = FALSE)
-      pairs <- rbind(pairs, new_pairs)
-      pairs <- unique(pairs)
-      
-      if (input$load_file) {
+      if (nrow(pairs) != 0) {
+        
+        targets <- sapply(strsplit(pairs$Genes, "\\.to\\."), function(x) x[2])
+        
+        incoming_edges <- colSums(matrix[, targets] > 0)
+        
+        genes_no_incoming <- names(incoming_edges[incoming_edges == 0])
+        
+        pairs$Genes <- ifelse(targets %in% genes_no_incoming, 
+                              paste("Root.to", targets, sep = "."),
+                              pairs$Genes)
+        
+        split_names <- strsplit(pairs$Genes, "\\.to\\.")
+        sources <- sapply(split_names, `[`, 1)
+        destinations <- sapply(split_names, `[`, 2)
+        
+        sources_no_destination <- sources[!sources %in% destinations]
+        
+        root_entries <- paste("Root.to", sources_no_destination, sep = ".")
+        
+        new_pairs <- data.frame(Genes = root_entries, stringsAsFactors = FALSE)
+        pairs <- rbind(pairs, new_pairs)
+        pairs <- unique(pairs)
+        
+        if (input$load_file) {
+          
+            filter_value <- input$binarization_surv
+            filter_perc <- input$binarization_percSurv
+            
 
-          filter_value <- input$binarization_surv
-          filter_perc <- input$binarization_percSurv
-          
-          
-          binarize_table_surv(filter_value, filter_perc, reshaped_dataSurv())
-          
-          mutation_db <- genotype_table_surv()
-          
-        
-      } else {
-        
-        filter_value <- input$binarization
-        filter_perc <- input$binarization_perc
-        
-        
-        binarize_table(filter_value, filter_perc, reshaped_data_matrix())
-        mutation_db <- genotype_table()
-      }
-      
-      
-      output_db <- matrix(0, nrow = nrow(mutation_db), ncol = length(pairs$Genes), 
-                          dimnames = list(rownames(mutation_db), pairs$Genes))
+            binarize_table_surv(filter_value, filter_perc, reshaped_dataSurv())
 
-      for (i in seq_len(ncol(output_db))) {
-        pair <- strsplit(colnames(output_db)[i], "\\.to\\.")[[1]]
-        if (pair[1] == "Root") {
-          if (pair[2] %in% colnames(mutation_db)) {
-            output_db[, i] <- as.integer(mutation_db[, pair[2]] == 1)
-          } else {
-            output_db[, i] <- 0  
-          }
+            mutation_db <- genotype_table_surv()
+            
+            
         } else {
-          if (all(c(pair[1], pair[2]) %in% colnames(mutation_db))) {
-            output_db[, i] <- as.integer((mutation_db[, pair[1]] == 1) & (mutation_db[, pair[2]] == 1))
+          
+          filter_value <- input$binarization
+          filter_perc <- input$binarization_perc
+          
+          
+          binarize_table(filter_value, filter_perc, reshaped_data_matrix())
+          mutation_db <- genotype_table()
+        }
+        
+        
+        output_db <- matrix(0, nrow = nrow(mutation_db), ncol = length(pairs$Genes), 
+                            dimnames = list(rownames(mutation_db), pairs$Genes))
+  
+        for (i in seq_len(ncol(output_db))) {
+          pair <- strsplit(colnames(output_db)[i], "\\.to\\.")[[1]]
+          if (pair[1] == "Root") {
+            if (pair[2] %in% colnames(mutation_db)) {
+              output_db[, i] <- as.integer(mutation_db[, pair[2]] == 1)
+            } else {
+              output_db[, i] <- 0  
+            }
           } else {
-            output_db[, i] <- 0  
+            if (all(c(pair[1], pair[2]) %in% colnames(mutation_db))) {
+              output_db[, i] <- as.integer((mutation_db[, pair[1]] == 1) & (mutation_db[, pair[2]] == 1))
+            } else {
+              output_db[, i] <- 0  
+            }
           }
         }
+      
+        
+        surv_data <- surv_data()
+        common_samples <- intersect(rownames(output_db), surv_data$SAMPLE)
+        
+        output_db <- output_db[rownames(output_db) %in% common_samples, ]
+        surv_data <- surv_data[surv_data$SAMPLE %in% common_samples, ]
+        surv_data(surv_data)
+        
+        
+        # Checking for all-zero or all-one columns
+        all_zero_one <- apply(output_db, 2, function(col) all(col == 0) || all(col == 1))
+        if (any(all_zero_one)) {
+          removed_cols <- colnames(output_db)[which(all_zero_one)]
+          showNotification(paste("Columns", paste(removed_cols, collapse = " "), 
+                                 "have been removed"), type = "message")
+          output_db <- output_db[, !all_zero_one]
+        }
+        
+  
+        output$dataTable_surv <- renderDT({
+          datatable(output_db, options = list(scrollX = TRUE), 
+                    selection = "single")
+        })
+        
+        evo_step(output_db)
+      } else {
+        showNotification("No DAG available with this regularizer", type = "error")
       }
-    
-
-      surv_data <- surv_data()
-      common_samples <- intersect(rownames(output_db), surv_data$SAMPLE)
-
-      output_db <- output_db[rownames(output_db) %in% common_samples, ]
-      surv_data <- surv_data[surv_data$SAMPLE %in% common_samples, ]
-      surv_data(surv_data)
-      
-      # Checking for all-zero or all-one columns
-      all_zero_one <- apply(output_db, 2, function(col) all(col == 0) || all(col == 1))
-      if (any(all_zero_one)) {
-        removed_cols <- colnames(output_db)[which(all_zero_one)]
-        showNotification(paste("Columns", paste(removed_cols, collapse = " "), 
-                               "have been removed"), type = "message")
-        output_db <- output_db[, !all_zero_one]
-      }
-      
-
-      output$dataTable_surv <- renderDT({
-        datatable(output_db, options = list(scrollX = TRUE), 
-                  selection = "single")
-      })
-      
-      evo_step(output_db)
     }
   })
   
@@ -1982,37 +2093,47 @@ server <- function(input, output, session) {
       
       #### Bulk single biopsy
       if (ncol(data) == 3) {
-        case_surv("bulk_single")
-        data <- distinct(data, SAMPLE, GENE, .keep_all = TRUE)
-        reshaped_dataSurv(
-          acast(data, SAMPLE ~ GENE, value.var = "CCF", fill = 0)
-        )
-        
-        output$dataTable_GenotypeSurv <- renderDT({
-          datatable(reshaped_dataSurv(), options = list(scrollX = TRUE))
-        })
-        
-        output$binarization_surv <- renderUI({
-          tagList(
-            div(style = "display: flex; align-items: center;",
-                numericInput("binarization_surv", 
-                             label = span("Filter to binarize ", 
-                                          tags$i(id = "helpIcon3", 
-                                                 class = "fa fa-question-circle", 
-                                                 style="margin-left: 5px;")), 
-                             value = 1, min = 0, max = 1, step = 0.01),
-                bsTooltip(id = "helpIcon3", 
-                          title = "Specify which threshold you want to use as a filter to binarize the database to be inputted into the next inference phase.", 
-                          placement = "right", trigger = "hover")
-            )
+        if (colnames(data)[1] =="SAMPLE" & colnames(data)[2] =="GENE" &
+            colnames(data)[3] =="CCF") {
+          case_surv("bulk_single")
+          data <- distinct(data, SAMPLE, GENE, .keep_all = TRUE)
+          reshaped_dataSurv(
+            acast(data, SAMPLE ~ GENE, value.var = "CCF", fill = 0)
           )
-        })
-        
-        output$binarization_percSurv <- NULL
-        
+          
+          output$dataTable_GenotypeSurv <- renderDT({
+            datatable(reshaped_dataSurv(), options = list(scrollX = TRUE))
+          })
+          
+          output$binarization_surv <- renderUI({
+            tagList(
+              div(style = "display: flex; align-items: center;",
+                  numericInput("binarization_surv", 
+                               label = span("Filter to binarize ", 
+                                            tags$i(id = "helpIcon3", 
+                                                   class = "fa fa-question-circle", 
+                                                   style="margin-left: 5px;")), 
+                               value = 1, min = 0, max = 1, step = 0.01),
+                  bsTooltip(id = "helpIcon3", 
+                            title = "Specify which threshold you want to use as a filter to binarize the database to be inputted into the next inference phase.", 
+                            placement = "right", trigger = "hover")
+              )
+            )
+          })
+          
+          output$binarization_percSurv <- NULL
+          
+          visualize_del()
+          
+          orig_genotypeSurv(reshaped_dataSurv())
+        } else{
+          showNotification("File not recognized. Make sure the column names are correct.", 
+                           type = "error")
+        }
       }
       else if (ncol(data) == 4) {   
-        if (colnames(data)[2]=="REGION") {
+        if (colnames(data)[1]=="SAMPLE" & colnames(data)[2]=="REGION" &
+               colnames(data)[3]=="GENE" & colnames(data)[4]=="CCF") {
           case_surv("bulk_multiple")
           data <- distinct(data, SAMPLE, REGION, GENE, .keep_all = TRUE)
           
@@ -2062,8 +2183,13 @@ server <- function(input, output, session) {
               )
             )
           })
+          
+          visualize_del()
+          
+          orig_genotypeSurv(reshaped_dataSurv())
         }
-        else if (colnames(data)[2]=="CELL") {
+        else if (colnames(data)[1]=="PATIENT" & colnames(data)[2]=="CELL" &
+                         colnames(data)[3]=="GENE" & colnames(data)[4]=="VALUE") {
           case_surv("single_cell")
           data <- distinct(data, PATIENT, CELL, GENE, .keep_all = TRUE)
           
@@ -2097,26 +2223,25 @@ server <- function(input, output, session) {
           })
           
           output$binarization_percSurv <- NULL
+          
+          visualize_del()
+          
+          orig_genotypeSurv(reshaped_dataSurv())
+          
+        } else {
+          showNotification("File not recognized. Make sure the column names are correct.", 
+                           type = "error")
         }
       }
-      output$DeleteColumn_surv <- render_delete_column_ui("DeleteColumn_surv", 
-                                                          "Delete column", 
-                                                          reshaped_dataSurv())
-      output$DeleteRow_surv <- render_delete_row_ui("DeleteRow_surv", 
-                                                    "Delete row", 
-                                                    reshaped_dataSurv())
-      
-      orig_genotypeSurv(reshaped_dataSurv())
     }
   })
   
   binarize_table_surv <- function(filter, filter_perc, reshaped_data) {
     genotype_table_surv(reshaped_data)
-    
     if(is.na(filter)) {
       showNotification("Enter a valid value in the binarization field", type = "error")
     }
-    else if (case_surv() == "bulk_single" || case_surv() == "single_cell") {
+    else if (is.null(case_surv()) || case_surv() != "bulk_multiple") {
       #filter the genotype_table_surv table
       genotype_table_surv(ifelse(genotype_table_surv() >= filter, 1, 0))
     }
@@ -2167,13 +2292,17 @@ server <- function(input, output, session) {
   }
   
   observe({
-    req(reshaped_dataSurv())  # Assicura che i dati iniziali siano caricati
+    req(reshaped_dataSurv())  
     updated_data <- modify_reshaped_dataSurv(orig_genotypeSurv())
-    reshaped_dataSurv(updated_data)  # Aggiorna il valore reattivo
+    reshaped_dataSurv(updated_data) 
     
-    # Mantieni il valore dell'input per le colonne dopo l'aggiornamento
+    output$dataTable_GenotypeSurv <- renderDT({
+      datatable(reshaped_dataSurv(), options = list(scrollX = TRUE))
+    })
     updateTextInput(session, "DeleteColumn_surv", value = input$DeleteColumn_surv)
     updateTextInput(session, "DeleteRow_surv", value = input$DeleteRow_surv)
+    
+    
   })
   
   # Rendering della DataTable
@@ -2181,16 +2310,6 @@ server <- function(input, output, session) {
     req(reshaped_dataSurv())  # Assicura la presenza di dati
     datatable(reshaped_dataSurv(), options = list(scrollX = TRUE))
   })
-  
-  observeEvent(input$load_file, {
-    output$dataTable_GenotypeSurv <- NULL
-    output$dataTable_surv <- NULL
-    output$binarization_percSurv <- NULL
-    output$binarization_surv <- NULL
-    output$DeleteColumn_surv <- NULL
-    output$DeleteRow_surv <- NULL
-  })
-  
   
   
   ############################ Output survival  #################################
@@ -2206,111 +2325,115 @@ server <- function(input, output, session) {
       resExampleEvosigs <- evoSigs( survivalData = amlExample$survival_data,
                                     evolutionarySteps = amlExample$evolutionary_steps )
       
-      output$combined_graph <- renderGirafe({
-        df_prev <- resExampleEvosigs$clustersPrevalence
-        if (!is.data.frame(df_prev)) {
-          df_prev <- as.data.frame(df_prev)
-        }
-        df_prev$Cluster <- factor(1:nrow(df_prev))
-        names(df_prev) <- gsub(".to.", " > ", names(df_prev))
-        df_prev_long <- melt(df_prev, id.vars = "Cluster", variable.name = "GenePair", value.name = "Prevalence")
-        df_prev_long$Source <- "Prev"
-        
-        result <- resExampleEvosigs$clustersPrevalence
-        for (col in colnames(result)) {
-          if (col %in% names(resExampleEvosigs$evolutionarySteps)) {
-            result[, col] <- ifelse(result[, col] != 0, 
-                                    resExampleEvosigs$evolutionarySteps[col], 0)
-          }
-        }
-        df_risk <- as.data.frame(result)
-        df_risk$Cluster <- factor(1:nrow(df_risk))
-        names(df_risk) <- gsub(".to.", " > ", names(df_risk))
-        df_risk_long <- melt(df_risk, id.vars = "Cluster", variable.name = "GenePair", value.name = "Prevalence")
-        df_risk_long$Source <- "Risk"
-        
-        combined_df <- rbind(df_prev_long, df_risk_long)
-        combined_df$Source <- factor(combined_df$Source, levels = c("Risk", "Prev"))
-        
-        num_colors <- length(levels(combined_df$Cluster))  
-        colors_dark2 <- brewer.pal(num_colors, "Dark2")    
-        
-        combined_df$Color <- ifelse(combined_df$Source == "Prev", "#FFC0CA",  
-                                    colors_dark2[as.integer(combined_df$Cluster)]) 
-        
-        custom_labels <- function(x) {
-          ifelse(x %% 1 == 0, as.character(x), as.character(x))
-        }
-        
-        p <- ggplot(data = combined_df, aes(x = Prevalence, y = GenePair, fill = Color, tooltip = Prevalence, data_id = GenePair)) +
-          geom_bar_interactive(stat = "identity", position = position_dodge(width = 0.5), width = 0.4, hover_css = "fill: black;") +
-          facet_wrap(~ Cluster + Source, scales = "free_x", nrow = 1, strip.position = "top") +
-          scale_fill_identity() +
-          scale_x_continuous(breaks = seq(-1, 1, by = 0.5), labels = custom_labels) +
-          theme_minimal() +
-          theme(
-            axis.title = element_blank(),
-            axis.text.y = element_text(angle = 0, vjust = 0.5, size = 6),
-            axis.text.x = element_text(angle = 0, hjust = 0.5, size = 6),
-            legend.position = "none",
-            strip.text.x = element_text(angle = 0, hjust = 0.5, size = 6),
-            strip.text.y = element_text(angle = 0, hjust = 0.5, size = 6),
-            plot.title = element_text(hjust = 0.4, size = 9),  
-            panel.background = element_rect(fill = alpha("grey90", 0.5), color = NA),  
-            panel.grid.major = element_line(color = "white")
-          ) +
-          labs(y = "", x = "Prevalence", title = "Evolutionary Signatures")
-        
-        girafe(ggobj = p)
-      })
-      
-      new_df <- reactive({
-        times <- resExampleEvosigs$survivalAnalysis$data$times
-        status <- resExampleEvosigs$survivalAnalysis$data$status
-        clusters <- resExampleEvosigs$survivalAnalysis$clusters
-        df <- data.frame(times = times, status = status, clusters = clusters)
-        rownames(df) <- rownames(resExampleEvosigs$survivalAnalysis$data)
-        df
-      })
-      
-      
-      output$survPlot <- renderPlotly({
-        df <- new_df()  
-        fit <- survfit(Surv(times, status) ~ clusters, data = df)
-        
-        g <- ggsurvplot(fit, data = df, risk.table = FALSE,
-                        title = "Survival Probability",
-                        palette = "Dark2", legend.title = "Legend",
-                        ggtheme = theme_minimal(),
-                        censor = FALSE, pval = FALSE)  
-        
-        p <- ggplotly(g$plot)
-        
-        p <- p %>% layout(
-          title = list(text = "Survival Probability", font = list(size = 17), x = 0.5, xanchor = "center" ),
-          legend = list(orientation = "h", x = 0.5, xanchor = "center", y = 1.05),
-          annotations = list(
-            list(
-              text = "p<0.0001",
-              x = 0.05,  
-              xref = "paper",
-              y = 0.25,  
-              yref = "paper",
-              showarrow = FALSE,
-              font = list(size = 12)
-            )
-          )
-        )
-
-        return(p)
-        
-      })
-      
+      resExampleEvosigs(resExampleEvosigs)
+    
+      visualize_output_surv(resExampleEvosigs)
       
       updateTabItems(session, "sidebarMenu", "output_surv")
     }
   })
 
+  visualize_output_surv <- function(resExampleEvosigs) {
+    output$combined_graph <- renderGirafe({
+      df_prev <- resExampleEvosigs$clustersPrevalence
+      if (!is.data.frame(df_prev)) {
+        df_prev <- as.data.frame(df_prev)
+      }
+      df_prev$Cluster <- factor(1:nrow(df_prev))
+      names(df_prev) <- gsub(".to.", " > ", names(df_prev))
+      df_prev_long <- melt(df_prev, id.vars = "Cluster", variable.name = "GenePair", value.name = "Prevalence")
+      df_prev_long$Source <- "Prev"
+      
+      result <- resExampleEvosigs$clustersPrevalence
+      for (col in colnames(result)) {
+        if (col %in% names(resExampleEvosigs$evolutionarySteps)) {
+          result[, col] <- ifelse(result[, col] != 0, 
+                                  resExampleEvosigs$evolutionarySteps[col], 0)
+        }
+      }
+      df_risk <- as.data.frame(result)
+      df_risk$Cluster <- factor(1:nrow(df_risk))
+      names(df_risk) <- gsub(".to.", " > ", names(df_risk))
+      df_risk_long <- melt(df_risk, id.vars = "Cluster", variable.name = "GenePair", value.name = "Prevalence")
+      df_risk_long$Source <- "Risk"
+      
+      combined_df <- rbind(df_prev_long, df_risk_long)
+      combined_df$Source <- factor(combined_df$Source, levels = c("Risk", "Prev"))
+      
+      num_colors <- length(levels(combined_df$Cluster))  
+      colors_dark2 <- brewer.pal(num_colors, "Dark2")    
+      
+      combined_df$Color <- ifelse(combined_df$Source == "Prev", "#FFC0CA",  
+                                  colors_dark2[as.integer(combined_df$Cluster)]) 
+      
+      custom_labels <- function(x) {
+        ifelse(x %% 1 == 0, as.character(x), as.character(x))
+      }
+      
+      p <- ggplot(data = combined_df, aes(x = Prevalence, y = GenePair, fill = Color, tooltip = Prevalence, data_id = GenePair)) +
+        geom_bar_interactive(stat = "identity", position = position_dodge(width = 0.5), width = 0.4, hover_css = "fill: black;") +
+        facet_wrap(~ Cluster + Source, scales = "free_x", nrow = 1, strip.position = "top") +
+        scale_fill_identity() +
+        scale_x_continuous(breaks = seq(-1, 1, by = 0.5), labels = custom_labels) +
+        theme_minimal() +
+        theme(
+          axis.title = element_blank(),
+          axis.text.y = element_text(angle = 0, vjust = 0.5, size = 6),
+          axis.text.x = element_text(angle = 0, hjust = 0.5, size = 6),
+          legend.position = "none",
+          strip.text.x = element_text(angle = 0, hjust = 0.5, size = 6),
+          strip.text.y = element_text(angle = 0, hjust = 0.5, size = 6),
+          plot.title = element_text(hjust = 0.4, size = 9),  
+          panel.background = element_rect(fill = alpha("grey90", 0.5), color = NA),  
+          panel.grid.major = element_line(color = "white")
+        ) +
+        labs(y = "", x = "Prevalence", title = "Evolutionary Signatures")
+      
+      girafe(ggobj = p)
+    })
+    
+    new_df <- reactive({
+      times <- resExampleEvosigs$survivalAnalysis$data$times
+      status <- resExampleEvosigs$survivalAnalysis$data$status
+      clusters <- resExampleEvosigs$survivalAnalysis$clusters
+      df <- data.frame(times = times, status = status, clusters = clusters)
+      rownames(df) <- rownames(resExampleEvosigs$survivalAnalysis$data)
+      df
+    })
+    
+    
+    output$survPlot <- renderPlotly({
+      df <- new_df()  
+      fit <- survfit(Surv(times, status) ~ clusters, data = df)
+      
+      g <- ggsurvplot(fit, data = df, risk.table = FALSE,
+                      title = "Survival Probability",
+                      palette = "Dark2", legend.title = "Legend",
+                      ggtheme = theme_minimal(),
+                      censor = FALSE, pval = FALSE)  
+      
+      p <- ggplotly(g$plot)
+      
+      p <- p %>% layout(
+        title = list(text = "Survival Probability", font = list(size = 17), x = 0.5, xanchor = "center" ),
+        legend = list(orientation = "h", x = 0.5, xanchor = "center", y = 1.05),
+        annotations = list(
+          list(
+            text = "p<0.0001",
+            x = 0.05,  
+            xref = "paper",
+            y = 0.25,  
+            yref = "paper",
+            showarrow = FALSE,
+            font = list(size = 12)
+          )
+        )
+      )
+      
+      return(p)
+      
+    })
+  }
   ############################ Save project  ################################# 
   
   observe({
@@ -2336,10 +2459,35 @@ server <- function(input, output, session) {
       }
       directory_file <- paste0(directory_complete, "/genotipo.csv")
       saveData(reshaped_data() , directory_file)
-      values <- c("binarization", "del_col", "del_row", "flag_resampling", 
-                  "nresampling", "restarts", "regularization", "command", 
-                  "seed", "iteration", "flag_confidence", "nresampling_confidence", "output_inference")
       
+      directory_file <- paste0(directory_complete, "/genotipo_surv.csv")
+      if (!is.null(orig_genotypeSurv())) {
+        saveData(orig_genotypeSurv() , directory_file)
+      }
+      
+
+      directory_file <- paste0(directory_complete, "/surv_data.csv")
+      if (!is.null(surv_data())) {
+        saveData(surv_data() , directory_file)
+      }
+      
+      directory_file <- paste0(directory_complete, "/resExampleEvosigs.rds")
+      if (!is.null(resExampleEvosigs())) {
+        saveRDS(resExampleEvosigs() , directory_file)
+      }
+
+      
+      if ((!is.null(case_surv())) && case_surv() == "bulk_multiple") {
+        values <- c("binarization", "del_col", "del_row", "flag_resampling", 
+                    "nresampling", "restarts", "regularization", "command", 
+                    "seed", "iteration", "flag_confidence", "nresampling_confidence",  
+                    "reg_surv", "flag_surv", "binarization_surv", "del_col_surv", "del_row_surv", "binarizationPerc_surv")
+      } else {
+        values <- c("binarization", "del_col", "del_row", "flag_resampling", 
+                    "nresampling", "restarts", "regularization", "command", 
+                    "seed", "iteration", "flag_confidence", "nresampling_confidence",  
+                    "reg_surv", "flag_surv", "binarization_surv", "del_col_surv", "del_row_surv")
+      }
       sequence <- ifelse((!is.null(input$binarization)), input$binarization, NA)
       sequence <- c(sequence, ifelse((!is.null(input$DeleteColumn)), 
                                      toString(input$DeleteColumn), NA))
@@ -2357,13 +2505,28 @@ server <- function(input, output, session) {
                                      input$command, NA))
       sequence <- c(sequence, ifelse((!is.null(input$seed)), input$seed, NA))
       
-      sequence <- c(sequence, ifelse((!is.null(input$iteration_confEstimation)), input$iteration_confEstimation, NA))
+      sequence <- c(sequence, ifelse((!is.null(input$iteration_confEstimation)), 
+                                     input$iteration_confEstimation, NA))
       
-      sequence <- c(sequence, ifelse((!is.null(input$resamplingFlag_conf)), input$resamplingFlag_conf, NA))
+      sequence <- c(sequence, ifelse((!is.null(input$resamplingFlag_conf)), 
+                                     input$resamplingFlag_conf, NA))
+      sequence <- c(sequence, ifelse((!is.null(input$nresampling_conf)), 
+                                     input$nresampling_conf, NA))
+      sequence <- c(sequence, ifelse((!is.null(input$regularization_surv)), 
+                                     input$regularization_surv, NA))
       
-      sequence <- c(sequence, ifelse((!is.null(input$nresampling_conf)), input$nresampling_conf, NA))
-      
-      
+      sequence <- c(sequence, ifelse((!is.null(input$load_file)), 
+                                     input$load_file, NA))
+      sequence <- c(sequence, ifelse((!is.null(input$binarization_surv)), 
+                                     toString(input$binarization_surv), NA))
+      sequence <- c(sequence, ifelse((!is.null(input$DeleteColumn_surv)), 
+                                     toString(input$DeleteColumn_surv), NA))
+      sequence <- c(sequence, ifelse((!is.null(input$DeleteRow_surv)), 
+                                     toString(input$DeleteRow_surv), NA))
+      if ((!is.null(case_surv())) && case_surv() == "bulk_multiple") {
+        sequence <- c(sequence, ifelse((!is.null(input$binarization_percSurv)), 
+                                       toString(input$binarization_percSurv), NA))
+      }
       
       
       matrix_data <- matrix(data = c(values, sequence),
@@ -2376,18 +2539,21 @@ server <- function(input, output, session) {
       
       directory_file <- paste0(directory_complete, "/parameters.csv")
       saveData(matrix_dataframe , directory_file)
-      
       if(!is.null(resampling_res())) {
         directory_file <- paste0(directory_complete, "/resampling_res.rds")
         saveRDS(resampling_res(), directory_file)
       }
-      
       if(!is.null(conf_res())) {
         directory_file <- paste0(directory_complete, "/confidence_res.rds")
         saveRDS(conf_res(), directory_file)
       }
       
+      if(!is.null(evo_step()) && ncol(evo_step()) >= 2) {
+        directory_file <- paste0(directory_complete, "/evo_step.csv")
+        saveData(evo_step(), directory_file)
+      }
       
+
       if (case()=="bulk_single") {
         directory_file <- paste0(directory_complete, "/resampling_table.csv")
         if (!(is.null(reshaped_data2()))) {
@@ -2432,5 +2598,7 @@ server <- function(input, output, session) {
     else {
       showNotification("Nothing has been uploaded to save", type = "warning")
     }
+    
+
   })
 }

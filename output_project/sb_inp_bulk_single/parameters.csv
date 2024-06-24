@@ -1,0 +1,18 @@
+"","name","value"
+"1","binarization","0.5"
+"2","del_col","ALK, APC"
+"3","del_row","aml_ohsu_2022_2000_BA2123, aml_ohsu_2022_2001_BA2702"
+"4","flag_resampling","TRUE"
+"5","nresampling",NA
+"6","restarts","9"
+"7","regularization","aic, bic"
+"8","command","tabu"
+"9","seed","1234"
+"10","iteration","2"
+"11","flag_confidence","TRUE"
+"12","nresampling_confidence","3"
+"13","reg_surv","aic"
+"14","flag_surv","FALSE"
+"15","binarization_surv",NA
+"16","del_col_surv",NA
+"17","del_row_surv",NA
