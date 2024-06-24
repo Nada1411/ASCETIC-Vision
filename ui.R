@@ -323,9 +323,7 @@ shinyUI(
             fluidRow(
               column(6,
                      selectInput("regularization_surv", "Regularization", choices = NULL),
-                     uiOutput("dataFile2_surv"),
-                     actionButton("submit_surv", "Evolutionary step", class = "custom-button", style = "margin-top: 30px;"),
-                     actionButton("calc_surv", "Calculate survival", class = "custom-button", style = "margin-top: 30px;")
+                     uiOutput("dataFile2_surv")
               ),
               column(6,
                      tags$div(
@@ -337,6 +335,12 @@ shinyUI(
                                 uiOutput("dataFile_surv")
                        ),
                      )
+              ),
+              fluidRow(
+                div(style = "padding-left: 30px;",
+                  actionButton("submit_surv", "Evolutionary step", class = "custom-button", style = "margin-top: 30px;"),
+                  actionButton("calc_surv", "Calculate survival", class = "custom-button", style = "margin-top: 30px;")
+                )
               )
             ),
             div(style = "margin-top: 30px;",  
