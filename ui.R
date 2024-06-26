@@ -334,12 +334,10 @@ shinyUI(
                        ),
                      )
               ),
-              fluidRow(
-                div(style = "padding-left: 30px;",
-                  actionButton("submit_surv", "Evolutionary step", class = "custom-button", style = "margin-top: 30px;"),
-                  actionButton("calc_surv", "Calculate survival", class = "custom-button", style = "margin-top: 30px;")
-                )
-              )
+              column(12, align = "left",
+                     actionButton("submit_surv", "Evolutionary step", class = "custom-button", style = "margin-top: 30px;"),
+                     actionButton("calc_surv", "Calculate survival", class = "custom-button", style = "margin-top: 30px;")
+              ),
             ),
             div(style = "margin-top: 30px;",  
                 fluidRow(
