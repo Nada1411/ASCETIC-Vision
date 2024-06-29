@@ -499,7 +499,8 @@ shinyUI(
             fluidRow(
                   plotlyOutput("survPlot", width = "100%", height = "400px"),
                   style = "width: 75%; margin: 0 auto;",
-                  plotlyOutput("survPlot2", width = "100%", height = "400px"),
+                  tags$br(),
+                  plotlyOutput("survPlot2", width = "100%", height = "200px"),
             )
           )
         ),

@@ -986,16 +986,25 @@ server <- function(input, output, session) {
       df
     })
     
+    generate_labels <- function(num_clusters) {
+        paste0("EvoSig", 1:num_clusters)
+      }
     
-    output$survPlot <- renderPlotly({
+    
       df <- new_df()  
+      
+      num_clusters <- length(unique(df$clusters))
+      new_labels <- generate_labels(num_clusters)
+      df$clusters <- factor(df$clusters)
+      levels(df$clusters) <- new_labels
       fit <- survfit(Surv(times, status) ~ clusters, data = df)
       
       g <- ggsurvplot(fit, data = df, risk.table = TRUE,
                       title = "Kaplan Meier estimates",
-                      palette = "Dark2", legend.title = "Legend",
+                      palette = "Dark2", legend.title="",
+                      legend.labs = new_labels,
                       ggtheme = theme_minimal(),
-                      censor = FALSE, pval = FALSE)  
+                      censor = FALSE, pval = FALSE,)  
       
       p <- ggplotly(g$plot)
       
@@ -1015,9 +1024,16 @@ server <- function(input, output, session) {
         )
       )
       
-      return(p)
+      # Create risk table as a separate plot
+      risk_table <- ggplotly(g$table)
       
-    })
+      risk_table <- risk_table %>% layout(
+        title = list(text = "Risk table", font = list(size = 17), x = 0.5, xanchor = "center" )
+      )
+      
+      output$survPlot2 <- renderPlotly({risk_table})
+      output$survPlot <- renderPlotly({p})
+
   }
   
   # Link to external db
