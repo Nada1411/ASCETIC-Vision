@@ -29,6 +29,19 @@ body {
   border-color: #242D33;
 }
 
+.custom-button2 {
+  color: white;
+  background-color: #242D33;
+  border-color: #242D33;
+  border-radius: 3px;
+}
+          
+.custom-button2:hover, .custom-button2:active {
+  color: white;
+  background-color: #628291;
+  border-color: #628291;
+}
+
 .custom-button-confEstimation {
   pointer-events: none;
   color: white;
@@ -181,6 +194,7 @@ Monito
   background-color: #242D33;
   border-color: #242D33;
 }
+
 
 .irs-bar, .irs-bar-edge, .irs-from, .irs-to, .irs-single {
   background: #79A0B3 !important; 

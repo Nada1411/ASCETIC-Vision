@@ -29,11 +29,13 @@ server <- function(input, output, session) {
   reshaped_dataSurv <- reactiveVal(NULL)
   genotype_table_surv <- reactiveVal(FALSE)
   orig_genotypeSurv <- reactiveVal(NULL)
+  orig_dataSurv <- reactiveVal(NULL)
   surv_data <- reactiveVal(NULL)
   evo_step <- reactiveVal(NULL)
   reg_sel <- reactiveVal(NULL)
   resExampleEvosigs <- reactiveVal(NULL)
-  
+  col_names <- reactiveVal(NULL)
+
   # Active app
   observe({
     if (!app_activated()) {
@@ -52,14 +54,14 @@ server <- function(input, output, session) {
       tagList(
         div(style = "align-items: center;", 
             fileInput("dataFile2_surv", 
-                      label = span("Survival data", 
+                      label = span("Provide survival data input", 
                                    tags$i(id = "helpIcon", 
                                           class = "fa fa-question-nitro", 
                                           style="margin-left: 5px;"))),
             bsTooltip(id = "helpIcon", 
                       title = "Select the file containing the information about the sample taken and its CCF.", 
                       placement = "right", trigger = "hover"),
-            actionButton("loadBtn2_surv", "Load", class = "custom-button")
+            actionButton("loadBtn2_surv", "Load", class = "custom-button", style = "margin-top: -25px;")
         )
       )
     }
@@ -67,18 +69,17 @@ server <- function(input, output, session) {
   
   # Display the genotype table entry if the app is active
   output$dataFile <- renderUI({
-    if (app_activated()) {
+    if (app_activated() && input$data_type != "Select data type") {
       tagList(
         div(style = "display: flex; align-items: center;", 
-            fileInput("dataFile", 
-                      label = span("Genotype ", 
-                                   tags$i(id = "helpIcon", 
-                                          class = "fa fa-question-circle", 
-                                          style="margin-left: 5px;"))),
-            bsTooltip(id = "helpIcon", 
-                      title = "Select the file containing the information about the sample taken and its CCF.", 
+            fileInput("dataFile", label = span(""))),
+        div(style = "display: flex; align-items: center;",
+            actionButton("loadBtn", "Load", class = "custom-button", 
+                         style = "margin-top: -35px;"),
+            bsTooltip(id = "loadBtn", 
+                      title = "Load to view and edit the selected file.", 
                       placement = "right", trigger = "hover")
-        )
+        ),
       )
     }
   })
@@ -97,7 +98,7 @@ server <- function(input, output, session) {
             bsTooltip(id = "helpIcon", 
                       title = "Select the file containing the information about the sample taken and its CCF.", 
                       placement = "right", trigger = "hover"),
-            actionButton("loadBtn_surv", "Load", class = "custom-button")
+            actionButton("loadBtn_surv", "Load", class = "custom-button", style = "margin-top: -25px;")
         )
       )
     }
@@ -110,11 +111,46 @@ server <- function(input, output, session) {
                       choices = input$regularization)
   })
   
+  # Iteration constraint management
+  observeEvent(input$iteration_confEstimation, {
+    x <- input$iteration_confEstimation
+    if ( !is.na(x) && x < 3){
+      updateNumericInput(session, "iteration_confEstimation", value = 3)
+      showNotification("Minimum value 3 ", type = "warning")
+    }
+  })
+  
+  # Num. of resampling in confidence estimation constraint management
+  observeEvent(input$nresampling_conf, {
+    x <- input$nresampling_conf
+    if ( !is.na(x) && (x < 3)){
+      updateNumericInput(session, "nresampling_conf", value = 3)
+      showNotification("Minimum value 3 ", type = "warning")
+    }
+  })
+  
+  # Num. of resampling constraint management
+  observeEvent(input$nresampling, {
+    x <- input$nresampling
+    if ( !is.na(x) && (x < 3)){
+      updateNumericInput(session, "nresampling", value = 3)
+      showNotification("Minimum value 3 ", type = "warning")
+    }
+  })
+
+  observeEvent(input$resamplingFlag, {
+    updateNumericInput(session, "nresampling", value = 10)
+  })
+  
+  observeEvent(input$resamplingFlag_conf, {
+    updateNumericInput(session, "nresampling_conf", value = 10)
+  })
+  
   # Binarization field constraint management
   observeEvent(input$binarization, {
     x <- input$binarization
     if ( !is.na(x) && (x > 1 || x < 0)){
-      updateNumericInput(session, "binarization", value = 1)
+      updateNumericInput(session, "binarization", value = 0.05)
       showNotification("Allowed range 0-1 ", type = "warning")
     }
   })
@@ -123,7 +159,7 @@ server <- function(input, output, session) {
   observeEvent(input$binarization_perc, {
     x <- input$binarization_perc
     if ( !is.na(x) && (x > 1 || x < 0)){
-      updateNumericInput(session, "binarization_perc", value = 1)
+      updateNumericInput(session, "binarization_perc", value = 0.00)
       showNotification("Allowed range 0-1 ", type = "warning")
     }
   })
@@ -132,7 +168,7 @@ server <- function(input, output, session) {
   observeEvent(input$binarization_surv, {
     x <- input$binarization_surv
     if ( !is.na(x) && (x > 1 || x < 0)){
-      updateNumericInput(session, "binarization_surv", value = 1)
+      updateNumericInput(session, "binarization_surv", value = 0.05)
       showNotification("Allowed range 0-1 ", type = "warning")
     }
   })
@@ -141,7 +177,15 @@ server <- function(input, output, session) {
   observeEvent(input$binarization_percSurv, {
     x <- input$binarization_percSurv
     if ( !is.na(x) && (x > 1 || x < 0)){
-      updateNumericInput(session, "binarization_percSurv", value = 1)
+      updateNumericInput(session, "binarization_percSurv", value = 0.00)
+      showNotification("Allowed range 0-1 ", type = "warning")
+    }
+  })
+  
+  observeEvent(input$binarization_surv2, {
+    x <- input$binarization_surv2
+    if ( !is.na(x) && (x > 1 || x < 0)){
+      updateNumericInput(session, "binarization_surv2", value = 0.00)
       showNotification("Allowed range 0-1 ", type = "warning")
     }
   })
@@ -150,13 +194,10 @@ server <- function(input, output, session) {
   ############################ Function  #######################################
   
   reset_common_values <- function() {
-    output$directoryInput <- renderUI(NULL)
+    output$dataTable2 <- NULL
     output$binarization_perc <- renderUI(NULL)
     output$binarization <- renderUI(NULL)
-    output$loadBtn2 <- renderUI(NULL)
     output$dataTable <- NULL
-    output$dataTable2 <- NULL
-    output$dataFile2 <- NULL
     output$gene_graph_tab <- NULL
     output$graph_inference <- NULL
     output$graph_conf <- NULL
@@ -167,7 +208,7 @@ server <- function(input, output, session) {
     updateCheckboxInput(session, "resamplingFlag", value = FALSE)
     updateCheckboxInput(session, "resamplingFlag_conf", value = FALSE)
     updateNumericInput(session, "nresampling", value = 3)
-    updateNumericInput(session, "iteration_confEstimation", value = 1)
+    updateNumericInput(session, "iteration_confEstimation", value = 10)
     updateNumericInput(session, "nresampling_conf", value = 3)
     updateSelectInput(session, "regularization", selected = "aic")
     updateSelectInput(session, "command", selected = "hc")
@@ -190,11 +231,15 @@ server <- function(input, output, session) {
     output$binarization_surv <- NULL
     output$DeleteColumn_surv <- NULL
     output$DeleteRow_surv <- NULL
+    output$binarization_surv2 <- NULL
+    output$DeleteColumn_surv2 <- NULL
+    output$DeleteRow_surv2 <- NULL
     updateCheckboxInput(session, "load_file", value = FALSE)
     output$dataTable_GenotypeSurv <- NULL
     output$dataTable_surv <- NULL
     app_activated_surv(FALSE)
     conf_res(NULL)
+    resampling_res(NULL)
   }
   
   # Resets values when loading a new project
@@ -209,6 +254,9 @@ server <- function(input, output, session) {
     updateSelectInput(session, "visualize_inference", selected = "poset")
     app_activated(FALSE)
     buttonClicked(FALSE)
+    output$dataTable2 <- NULL
+    output$loadBtn2 <- renderUI(NULL)
+    output$directoryInput <- renderUI(NULL)
   }
   
   # Resets values when loading a genotype file
@@ -225,7 +273,6 @@ server <- function(input, output, session) {
   # Resets values when creating a new project
   default_values_create_project <- function() {
     reset_common_values()
-    output$switchViewBtn <- renderUI(NULL)
     output$selected_result_output <- NULL
     output$selected_result_output_conf <- NULL
     orig <- reactiveVal(NULL)
@@ -234,6 +281,9 @@ server <- function(input, output, session) {
     output$visualize_inference <- NULL
     output$visualize_conf <- NULL
     app_activated(FALSE)
+    output$dataTable2 <- NULL
+    output$loadBtn2 <- renderUI(NULL)
+    output$directoryInput <- renderUI(NULL)
   }
   
   # Resets values when submit btm in inference
@@ -251,13 +301,35 @@ server <- function(input, output, session) {
   
   # Returns the list of project names in the output_project folder
   get_project_names <- function() {
-    project_names <- list.files("output_project")
-    file_infos <- file.info(file.path("output_project", project_names))
-    last_modified <- file_infos$mtime
-    project_info <- data.frame(project_names, last_modified)
+    project_names <- list.files("output_project", full.names = TRUE)
+    
+    project_info <- data.frame(Project_name = character(),
+                               Last_modified_directory = as.POSIXct(character()),
+                               Last_modified_file = as.POSIXct(character()),
+                               stringsAsFactors = FALSE)
+    
+    for (project_dir in project_names) {
+      project_name <- basename(project_dir)
+      
+      dir_info <- file.info(project_dir)
+      last_modified_directory <- dir_info$mtime
+      
+      modified_time_path <- file.path(project_dir, "modified_time.csv")
+      if (file.exists(modified_time_path)) {
+        file_info <- file.info(modified_time_path)
+        last_modified_file <- file_info$mtime
+      } else {
+        last_modified_file <- NA
+      }
+      
+      project_info <- rbind(project_info, data.frame(Project_name = project_name,
+                                                     Last_modified_directory = last_modified_directory,
+                                                     Last_modified_file = last_modified_file))
+    }
     
     return(project_info)
   }
+  
   
   # Generate heatmap
   generate_heatmap_plot <- function(data) {
@@ -284,10 +356,10 @@ server <- function(input, output, session) {
   # Visualization of deletion column and row in input survival phase
   visualize_del <- function() {
     output$DeleteColumn_surv <- render_delete_column_ui("DeleteColumn_surv", 
-                                                        "Delete column", 
+                                                        "Remove DNA alterations (column)", 
                                                         reshaped_dataSurv())
     output$DeleteRow_surv <- render_delete_row_ui("DeleteRow_surv", 
-                                                  "Delete row", 
+                                                  "Remove samples (row)", 
                                                   reshaped_dataSurv())
   }
   
@@ -544,30 +616,11 @@ server <- function(input, output, session) {
   # Manage bulk single case
   bulk_single_case <- function() {
     
-    output$dataFile2 <- renderUI({
-      tagList(
-        div(style = "display: flex; align-items: center;", 
-            fileInput("dataFile2", 
-                      label = span("Resampling ", 
-                                   tags$i(id = "helpIcon2", 
-                                          class = "fa fa-question-circle", 
-                                          style="margin-left: 5px;"))),
-            bsTooltip(id = "helpIcon2", 
-                      title = "If you want to perform the inference with resampling upload the file", 
-                      placement = "right", trigger = "hover")
-        )
-      )
-    })
-    
-    output$loadBtn2 <- renderUI({
-      actionButton("loadBtn2", "Load", class = "custom-button")
-    })
-    
     output$DeleteColumn <- render_delete_column_ui("DeleteColumn", 
-                                                   "Delete column", 
+                                                   "Remove DNA alterations (column)", 
                                                    reshaped_data())
     output$DeleteRow <- render_delete_row_ui("DeleteRow", 
-                                             "Delete row", 
+                                             "Remove samples (row)", 
                                              reshaped_data())
     
     # Management deletion or selection of rows and columns
@@ -579,10 +632,10 @@ server <- function(input, output, session) {
     modified_data <- reshaped_data()
     
     output$DeleteColumn <- render_delete_column_ui("DeleteColumn", 
-                                                   "Delete column", 
+                                                   "Remove DNA alterations (column)", 
                                                    reshaped_data())
     output$DeleteRow <- render_delete_row_ui("DeleteRow", 
-                                             "Delete row", 
+                                             "Remove samples (row)", 
                                              reshaped_data())
     
     handle_dataTable_cell_clicked(reshaped_data(), "ID")
@@ -635,10 +688,10 @@ server <- function(input, output, session) {
     modified_data <- reshaped_data()
     
     output$DeleteColumn <- render_delete_column_ui("DeleteColumn", 
-                                                   "Delete column", 
+                                                   "Remove DNA alterations (column)", 
                                                    reshaped_data())
     output$DeleteRow <- render_delete_row_ui("DeleteRow", 
-                                             "Delete row", 
+                                             "Remove samples (row)", 
                                              reshaped_data())
     
     handle_dataTable_cell_clicked(reshaped_data(), "ID")
@@ -679,12 +732,25 @@ server <- function(input, output, session) {
     shinyDirChoose(input, "dir", roots = c(wd = getwd()), filetypes = c("", "txt")) 
   }
   
+  prepareEdges <- function(edges, poset) {
+    if (!is.null(poset)) {
+      edges$weight <- mapply(function(from, to) poset[from, to], edges$from, edges$to)
+      edges$width <- edges$weight + 1  
+      edges$label <- paste0(" ", edges$weight) 
+    }
+    return(edges)
+  }
+  
   # Generate network graph
-  generateVisNetwork <- function(nodes, edges, layout_type, title) {
+  generateVisNetwork <- function(nodes, edges, layout_type, title, poset = NULL) {
+    edges <- prepareEdges(edges, poset)
+    
     main_options <- list(text = title,
                          style = "font-family:https://fonts.googleapis.com/css2?family=Roboto+Condensed:ital,wght@0,100..900;1,100..900&display=swap;
                                 font-weight: bold;
                                 text-align:center;")
+    
+    nodes <- nodes[order(nodes$label), ]
     
     if (layout_type == "poset") {
       visNetwork(nodes, edges, main = main_options, background = "white") %>%
@@ -748,7 +814,8 @@ server <- function(input, output, session) {
           shadow = FALSE,
           color = list(color = "#0085AF", highlight = "#B20062"),
           arrows = list(to = list(enabled = TRUE, scaleFactor = 0.5)),
-          width = 2
+          width = edges$width,
+          label = edges$label 
         ) %>%
         visOptions(nodesIdSelection = TRUE) %>%
         visInteraction(navigationButtons = TRUE) %>% 
@@ -821,23 +888,23 @@ server <- function(input, output, session) {
   }
   
   # Delete column or row of genotype file in input survival phase
-  modify_reshaped_dataSurv <- function(reshaped_data) {
+  modify_reshaped_dataSurv <- function(reshaped_data, del_row, del_col) {
     reshaped_data_df <- as.data.frame(reshaped_data)  # Conversione in data.frame
     
-    if (!is.null(input$DeleteColumn_surv) && length(input$DeleteColumn_surv) > 0) {
-      cols_to_delete <- unlist(strsplit(input$DeleteColumn_surv, ",\\s*"))
-      if (any(input$DeleteColumn_surv %in% colnames(reshaped_data_df))) {
+    if (!is.null(del_row) && length(del_row) > 0) {
+      cols_to_delete <- unlist(strsplit(del_row, ",\\s*"))
+      if (any(del_row %in% colnames(reshaped_data_df))) {
         reshaped_data_df <- reshaped_data_df[, !colnames(reshaped_data_df) 
-                                             %in% input$DeleteColumn_surv, drop = FALSE]
+                                             %in% del_row, drop = FALSE]
       }
     }
     
-    if (!is.null(input$DeleteRow_surv) && length(input$DeleteRow_surv) > 0) {
-      rows_to_delete <- as.numeric(unlist(strsplit(input$DeleteRow_surv, ",\\s*")))
-      if (any(input$DeleteRow_surv %in% rownames(reshaped_data_df)) || 
-          any(as.numeric(input$DeleteRow_surv) %in% 1:nrow(reshaped_data_df))) {
+    if (!is.null(del_col) && length(del_col) > 0) {
+      rows_to_delete <- as.numeric(unlist(strsplit(del_col, ",\\s*")))
+      if (any(del_col %in% rownames(reshaped_data_df)) || 
+          any(as.numeric(del_col) %in% 1:nrow(reshaped_data_df))) {
         reshaped_data_df <- reshaped_data_df[!rownames(reshaped_data_df) 
-                                             %in% input$DeleteRow_surv, , drop = FALSE]
+                                             %in% del_col, , drop = FALSE]
       }
     }
     
@@ -847,14 +914,15 @@ server <- function(input, output, session) {
   # Visualize survival output (risk-prev and kaplan-meier)
   visualize_output_surv <- function(resExampleEvosigs) {
     output$combined_graph <- renderGirafe({
+      # Assuming resExampleEvosigs is your result object with necessary data
       df_prev <- resExampleEvosigs$clustersPrevalence
       if (!is.data.frame(df_prev)) {
         df_prev <- as.data.frame(df_prev)
       }
-      df_prev$Cluster <- factor(1:nrow(df_prev))
+      df_prev$Cluster <- factor(paste("EvoSig", 1:nrow(df_prev), sep="")) # Custom cluster labels
       names(df_prev) <- gsub(".to.", " > ", names(df_prev))
       df_prev_long <- melt(df_prev, id.vars = "Cluster", variable.name = "GenePair", value.name = "Prevalence")
-      df_prev_long$Source <- "Prev"
+      df_prev_long$Source <- "Prevalence"
       
       result <- resExampleEvosigs$clustersPrevalence
       for (col in colnames(result)) {
@@ -864,19 +932,24 @@ server <- function(input, output, session) {
         }
       }
       df_risk <- as.data.frame(result)
-      df_risk$Cluster <- factor(1:nrow(df_risk))
+      df_risk$Cluster <- factor(paste("EvoSig", 1:nrow(df_risk), sep="")) # Custom cluster labels
       names(df_risk) <- gsub(".to.", " > ", names(df_risk))
       df_risk_long <- melt(df_risk, id.vars = "Cluster", variable.name = "GenePair", value.name = "Prevalence")
       df_risk_long$Source <- "Risk"
       
       combined_df <- rbind(df_prev_long, df_risk_long)
-      combined_df$Source <- factor(combined_df$Source, levels = c("Risk", "Prev"))
+      combined_df$Source <- factor(combined_df$Source, levels = c("Risk", "Prevalence"))
       
-      num_colors <- length(levels(combined_df$Cluster))  
-      colors_dark2 <- brewer.pal(num_colors, "Dark2")    
+      df_risk_long <- df_risk_long %>%
+        arrange(desc(Prevalence))
       
-      combined_df$Color <- ifelse(combined_df$Source == "Prev", "#FFC0CA",  
-                                  colors_dark2[as.integer(combined_df$Cluster)]) 
+      combined_df$GenePair <- factor(combined_df$GenePair, levels = unique(df_risk_long$GenePair))
+      
+      num_colors <- length(levels(combined_df$Cluster))
+      colors_dark2 <- brewer.pal(num_colors, "Dark2")
+      
+      combined_df$Color <- ifelse(combined_df$Source == "Prevalence", "#FFC0CA",  
+                                  colors_dark2[as.integer(combined_df$Cluster)])
       
       custom_labels <- function(x) {
         ifelse(x %% 1 == 0, as.character(x), as.character(x))
@@ -895,8 +968,8 @@ server <- function(input, output, session) {
           legend.position = "none",
           strip.text.x = element_text(angle = 0, hjust = 0.5, size = 6),
           strip.text.y = element_text(angle = 0, hjust = 0.5, size = 6),
-          plot.title = element_text(hjust = 0.4, size = 9),  
-          panel.background = element_rect(fill = alpha("grey90", 0.5), color = NA),  
+          plot.title = element_text(hjust = 0.4, size = 9),
+          panel.background = element_rect(fill = alpha("grey90", 0.5), color = NA),
           panel.grid.major = element_line(color = "white")
         ) +
         labs(y = "", x = "Prevalence", title = "Evolutionary Signatures")
@@ -918,8 +991,8 @@ server <- function(input, output, session) {
       df <- new_df()  
       fit <- survfit(Surv(times, status) ~ clusters, data = df)
       
-      g <- ggsurvplot(fit, data = df, risk.table = FALSE,
-                      title = "Survival Probability",
+      g <- ggsurvplot(fit, data = df, risk.table = TRUE,
+                      title = "Kaplan Meier estimates",
                       palette = "Dark2", legend.title = "Legend",
                       ggtheme = theme_minimal(),
                       censor = FALSE, pval = FALSE)  
@@ -927,7 +1000,7 @@ server <- function(input, output, session) {
       p <- ggplotly(g$plot)
       
       p <- p %>% layout(
-        title = list(text = "Survival Probability", font = list(size = 17), x = 0.5, xanchor = "center" ),
+        title = list(text = "Kaplan Meier estimates", font = list(size = 17), x = 0.5, xanchor = "center" ),
         legend = list(orientation = "h", x = 0.5, xanchor = "center", y = 1.05),
         annotations = list(
           list(
@@ -1004,7 +1077,74 @@ server <- function(input, output, session) {
   observeEvent(input$create_project_button, {
     rv$dataFile=NULL
     default_values_create_project()
+    updateSelectInput(session, "data_type", selected = "Select data type")
     updateTabItems(session, "sidebarMenu", "input")
+  })
+  
+  observeEvent(input$data_type, {
+      rv$dataFile=NULL
+      if (input$data_type == "Bulk single") {
+        output$directoryInput <- renderUI(NULL)
+        output$dataFile2 <- renderUI({
+          tagList(
+            div(style = "display: flex; align-items: center;", 
+                fileInput("dataFile2", 
+                          label = span("Resampling ", 
+                                       tags$i(id = "helpIcon2", 
+                                              class = "fa fa-question-circle", 
+                                              style="margin-left: 5px;"))),
+                bsTooltip(id = "helpIcon2", 
+                          title = "If you want to perform the inference with resampling upload the file", 
+                          placement = "right", trigger = "hover")
+            )
+          )
+        })
+        
+        output$loadBtn2 <- renderUI({
+          actionButton("loadBtn2", "Load", class = "custom-button", style = "margin-top: -35px;")
+        })
+    } else if (input$data_type == "Bulk multiple" || input$data_type == "Single cell"){
+      output$dataFile2 <- NULL
+      output$loadBtn2 <- renderUI(NULL)
+      output$directoryInput <- renderUI({
+        tagList(
+          div(style = "display: flex; align-items: center; gap: 5px;",
+              shinyDirButton("dir", "Select a folder", title = "Select a folder", 
+                             multiple = FALSE),
+              tags$i(id = "helpIconFolder", class = "fa fa-question-circle", 
+                     style="cursor: pointer;", `data-toggle`="tooltip", 
+                     `data-placement`="right",
+                     title="To perform the inference operation, it's necessary to select the folder containing the files corresponding to each row of the database along with its respective Directed Acyclic Graph (DAG).")
+          )
+        )
+      })
+    } else {
+      output$directoryInput <- renderUI(NULL)
+      output$dataFile2 <- NULL
+      output$loadBtn2 <- renderUI(NULL)
+    }
+  })
+  
+  observeEvent(input$resetBtn, {
+    rv$dataFile=NULL
+    default_values_create_project()
+    updateTabItems(session, "sidebarMenu", "input")
+  })
+  
+  observeEvent(input$survBtn, {
+    updateTabItems(session, "sidebarMenu", "input_surv")
+  })
+  
+  observeEvent(input$inferenceBtn, {
+    updateTabItems(session, "sidebarMenu", "inference")
+  })
+  
+  observeEvent(input$confidenceBtn, {
+    updateTabItems(session, "sidebarMenu", "confidence_estimation")
+  })
+  
+  observeEvent(input$out_survBtn, {
+    updateTabItems(session, "sidebarMenu", "output_surv")
   })
   
   # Show project names in "output_project" folder
@@ -1015,16 +1155,20 @@ server <- function(input, output, session) {
   # Show the table with the names of existing projects
   output$projectList <- renderDT({
     project_data <- project_names()
-    
     if (nrow(project_data) == 0) {
       project_data <- data.frame(Project_name = "There are no previously saved projects")
     } else {
       project_data$Data_type <- sapply(strsplit(project_data[,1], "_"), 
                                        function(x) paste(tail(x, 2), 
                                                          collapse = "_"))
+
       project_data$Data_type <- gsub("_", " ", project_data$Data_type) 
       project_data[,1] <- sub("_[^_]+$", "", sub("_[^_]+$", "", project_data[,1]))
-      project_data <- project_data[, c(1, 3, 2)]
+      project_data <- project_data[, c(1, 4, 3, 2)]
+      project_data[,4] <- format(as.POSIXct(project_data[,4], 
+                                            format = "%Y-%m-%dT%H:%M:%SZ"), 
+                                 format = "%Y-%m-%d %H:%M:%S")
+      
       project_data[,3] <- format(as.POSIXct(project_data[,3], 
                                             format = "%Y-%m-%dT%H:%M:%SZ"), 
                                  format = "%Y-%m-%d %H:%M:%S")
@@ -1032,12 +1176,13 @@ server <- function(input, output, session) {
     }
     
     datatable(project_data, rownames = FALSE, 
-              colnames = c("Project name", "Data type", "Last modified"), 
-              selection ="single", options = list(
+              colnames = c("Project name", "Data type", "Created", "Last modified"), 
+              selection = "single", options = list(
                 initComplete = JS(
                   "function(settings, json) {",
-                  "$(this.api().table().header()).css({'background-color': '#232E33', 
-                  'color': '#fff'});",
+                  "$(this.api().table().header()).css({'background-color': '#232E33', 'color': '#fff'});",
+                  "$(this.api().column(1).header()).append('<span id=\"dataTypeHelp\" data-toggle=\"tooltip\" title=\"Bulk multiple: data generated from bulk samples of multiple biopsies Bulk single: data generated from bulk samples of single biopsies Single cell: data generated from individual cells\" style=\"margin-left: 10px;\">&#9432;</span>');",
+                  "$('[data-toggle=\"tooltip\"]').tooltip();",
                   "}")
               )) 
   })
@@ -1055,10 +1200,6 @@ server <- function(input, output, session) {
       showNotification("Please select an existing project", type = "error")
       
     } else {
-      # Visualise switch bottom
-      output$switchViewBtn <- renderUI({
-        actionButton("switchViewBtn", "Switch View", class = "custom-button")
-      })
       
       # Management click on existing project table
       observeEvent(input$projectList_cell_clicked, {
@@ -1104,13 +1245,13 @@ server <- function(input, output, session) {
                       tagList(
                         div(style = "display: flex; align-items: center;",
                             numericInput("binarization_perc", 
-                                         label = span("Filter to binarize percentage ", 
+                                         label = span("Prevalence threshold", 
                                                       tags$i(id = "helpIcon4", 
                                                              class = "fa fa-question-circle", 
                                                              style="margin-left: 5px;")), 
                                          value = val_bin_perc, min = 0, max = 1, step = 0.01),
                             bsTooltip(id = "helpIcon4", 
-                                      title = "Specify the threshold you want to use as a filter to binarize the percentage of mutated regions in each sample of the database to be inputted into the next inference phase.", 
+                                      title = "Specify which threshold you want to use to binarize percentage in each sample.", 
                                       placement = "right", trigger = "hover")
                         )
                       )
@@ -1156,6 +1297,9 @@ server <- function(input, output, session) {
                 output$dataTable_GenotypeSurv <- renderDT({
                   datatable(data, options = list(scrollX = TRUE))
                 })
+                output$heatmap_GenotypeSurv <- renderUI({
+                  generate_heatmap_plot(data)
+                })
               }
               else if (file_name == "surv_data") {
                 data_surv <- read.csv(file_directory, row.names = 1)
@@ -1166,8 +1310,12 @@ server <- function(input, output, session) {
                 data <- read.csv(file_directory, row.names = 1)
                 data_evo <- as.matrix(data)
                 evo_step(data)
+                orig_dataSurv(data)
                 output$dataTable_surv <- renderDT({
                   datatable(data_evo, options = list(scrollX = TRUE))
+                })
+                output$heatmap_surv <- renderUI({
+                  generate_heatmap_plot(data_evo)
                 })
               }
               else if (file_name == "parameters") {
@@ -1185,14 +1333,14 @@ server <- function(input, output, session) {
                       tagList(
                         div(style = "display: flex; align-items: center;",
                             numericInput("binarization", 
-                                         label = span("Filter to binarize ", 
+                                         label = span("CCF threshold", 
                                                       tags$i(id = "helpIcon3", 
                                                              class = "fa fa-question-circle", 
                                                              style="margin-left: 5px;")), 
                                          value = binarization, min = 0, max = 1, 
                                          step = 0.01),
                             bsTooltip(id = "helpIcon3", 
-                                      title = "Specify which threshold you want to use as a filter to binarize the database to be inputted into the next inference phase.", 
+                                      title = "Specify which threshold you want to use to binarize CCF data.", 
                                       placement = "right", trigger = "hover")
                         )
                       )
@@ -1202,23 +1350,28 @@ server <- function(input, output, session) {
                     vettore <- unlist(strsplit(gsub("\"", "", value), ",\\s*"))
                     del_col_inf <- vettore[vettore != ""]
                     output$DeleteColumn <- render_delete_column_ui("DeleteColumn", 
-                                                                   "Delete column", 
+                                                                   "Remove DNA alterations (column)", 
                                                                    reshaped_data(),
                                                                    selected_columns = del_col_inf)
+                    
+                  }else if (parametro =="data_type") {
+                    updateSelectInput(session, "data_type", selected = value)
+                    
+                  }else if (parametro =="data_type_surv") {
+                    updateSelectInput(session, "data_type_surv", selected = value)
                     
                   }else if (parametro =="del_row") {
                     vettore <- unlist(strsplit(gsub("\"", "", value), ",\\s*"))
                     del_row_inf <- vettore[vettore != ""]
                     output$DeleteRow <- render_delete_row_ui("DeleteRow", 
-                                                             "Delete row", 
+                                                             "Remove samples (row)", 
                                                              reshaped_data(),
                                                              selected_rows = del_row_inf)
                   }else if (parametro == "flag_resampling") {
                     updateCheckboxInput(session, "resamplingFlag", 
-                                        value = as.logical(value))
+                                        value = as.logical(as.numeric(value)))
                   } else if (parametro == "nresampling") {
                     nresampling(as.numeric(value))
-                    print(value)
                     updateNumericInput(session, "nresampling", 
                                        value = as.numeric(value))
                   } else if (parametro == "restarts") {
@@ -1247,31 +1400,32 @@ server <- function(input, output, session) {
                     reg_sel(value)
                   } else if (parametro == "flag_surv") {
                     updateCheckboxInput(session, "load_file", 
-                                        value = as.logical(value))
+                                        value = as.logical(as.numeric(value)))
                   } else if (parametro == "binarization_surv" & !(is.na(value))){
                     binarization_surv <- as.numeric(value)
                     output$binarization_surv <- renderUI({
                       tagList(
                         div(style = "display: flex; align-items: center;",
                             numericInput("binarization_surv", 
-                                         label = span("Filter to binarize ", 
+                                         label = span("CCF threshold ", 
                                                       tags$i(id = "helpIcon3", 
                                                              class = "fa fa-question-circle", 
                                                              style="margin-left: 5px;")), 
                                          value = binarization_surv, min = 0, max = 1, 
                                          step = 0.01),
                             bsTooltip(id = "helpIcon3", 
-                                      title = "Specify which threshold you want to use as a filter to binarize the database to be inputted into the next inference phase.", 
+                                      title = "Specify which threshold you want to use to binarize CCF data.", 
                                       placement = "right", trigger = "hover")
                         )
                       )
                     })
+                    
                   }
                   else if (parametro =="del_col_surv" & !(is.na(value))) {
                     vettore <- unlist(strsplit(gsub("\"", "", value), ",\\s*"))
                     del_col <- vettore[vettore != ""]
                     output$DeleteColumn_surv <- render_delete_column_ui("DeleteColumn_surv", 
-                                                                   "Delete column", 
+                                                                   "Remove DNA alterations (column)", 
                                                                    orig_genotypeSurv(),
                                                                    selected_columns = del_col)
                     
@@ -1279,7 +1433,7 @@ server <- function(input, output, session) {
                     vettore <- unlist(strsplit(gsub("\"", "", value), ",\\s*"))
                     del_row <- vettore[vettore != ""]
                     output$DeleteRow_surv <- render_delete_row_ui("DeleteRow_surv", 
-                                                             "Delete row", 
+                                                             "Remove samples (row)", 
                                                              orig_genotypeSurv(),
                                                              selected_rows = del_row)
                   } else if (parametro == "binarizationPerc_surv" & !(is.na(value))) {
@@ -1288,20 +1442,61 @@ server <- function(input, output, session) {
                       tagList(
                         div(style = "display: flex; align-items: center;",
                             numericInput("binarization_percSurv", 
-                                         label = span("Filter to binarize ", 
-                                                      tags$i(id = "helpIcon3", 
+                                         label = span("Prevalence threshold ", 
+                                                      tags$i(id = "helpIcon4", 
                                                              class = "fa fa-question-circle", 
                                                              style="margin-left: 5px;")), 
-                                         value = binarizationPerc_surv, min = 0, max = 1, 
-                                         step = 0.01),
-                            bsTooltip(id = "helpIcon3", 
-                                      title = "Specify which threshold you want to use as a filter to binarize the database to be inputted into the next inference phase.", 
+                                         value = binarizationPerc_surv, min = 0, max = 1, step = 0.01),
+                            bsTooltip(id = "helpIcon4", 
+                                      title = "Specify which threshold you want to use to binarize percentage in each sample.", 
                                       placement = "right", trigger = "hover")
                         )
                       )
                     })
                     case_surv("bulk_multiple")
+                  } else if (parametro == "binarization_surv2" & !(is.na(value))){
+                    binarization_surv2 <- as.numeric(value)
+                    output$binarization_surv2 <- renderUI({
+                      tagList(
+                        div(style = "display: flex; align-items: center;",
+                            numericInput("binarization_surv2", 
+                                         label = span("Percentage threshold ", 
+                                                      tags$i(id = "helpIcon3", 
+                                                             class = "fa fa-question-circle", 
+                                                             style="margin-left: 5px;")), 
+                                         value = binarization_surv2, min = 0, max = 1, 
+                                         step = 0.01),
+                            bsTooltip(id = "helpIcon3", 
+                                      title = "Specify  the percentage of presence that each step must have.", 
+                                      placement = "right", trigger = "hover")
+                        )
+                      )
+                    })
+                    
+                  } else if (parametro =="del_col_surv2") {
+                    if (is.na(value)) {
+                      del_col <- character(0)
+                    } else {
+                      vettore <- unlist(strsplit(gsub("\"", "", value), ",\\s*"))
+                      del_col <- vettore[vettore != ""]
+                    }
+                  output$DeleteColumn_surv2 <- render_delete_column_ui("DeleteColumn_surv2", 
+                                                                      "Remove evolutionary step (column)", 
+                                                                      orig_dataSurv(),
+                                                                      selected_columns = del_col)
+                  
+                }else if (parametro =="del_row_surv2") {
+                  if (is.na(value)) {
+                    del_row <- character(0)
+                  } else {
+                    vettore <- unlist(strsplit(gsub("\"", "", value), ",\\s*"))
+                    del_row <- vettore[vettore != ""]
                   }
+                  output$DeleteRow_surv2 <- render_delete_row_ui("DeleteRow_surv2", 
+                                                                "Remove samples (row)", 
+                                                                orig_dataSurv(),
+                                                                selected_rows = del_row)
+                }
                 }
               }
               else if (file_name == "resampling_res") {
@@ -1312,11 +1507,20 @@ server <- function(input, output, session) {
                 names <- c(names, names(res$inference))
                 visualizeInferenceOutput(TRUE)
                 output$visualize_inference <- renderUI({
-                  selectInput("visualize_inference", 
-                              "Output inference", 
-                              c(names),
-                              selected = "poset")  
+                  select_input <- selectInput("visualize_inference", 
+                                              "Select your output", 
+                                              c(names),
+                                              selected = ifelse("rankingEstimate" %in% names, names[3], names[2]))
+                  
+                  tooltip <- bsTooltip(id = "visualize_inference", 
+                                       title = "Output types: rankingEstimate (Orders genetic mutations using the agony algorithm), poset (Shows all possible causal paths between genes in the ranking), DAG (Highlights significant relationships and repeated patterns of evolution among genetic mutations)",
+                                       placement = "right", 
+                                       trigger = "hover",
+                                       options = list(container = "body", html = TRUE))
+                  
+                  tagList(select_input, tooltip)
                 })
+                
               }else if (file_name == "resExampleEvosigs") {
                 resExampleEvosigs(readRDS(file_directory))
                 visualize_output_surv(resExampleEvosigs())
@@ -1329,10 +1533,17 @@ server <- function(input, output, session) {
                 names <- c(names, names(res$inference))
                 visualizeConfidenceOutput(TRUE)
                 output$visualize_conf <- renderUI({
-                  selectInput("visualize_conf", 
-                              "Output Confidence", 
-                              c(names),
-                              selected = "poset")  
+                select_input <- selectInput("visualize_conf", 
+                                            "Select your output", 
+                                            c(names),
+                                            selected = ifelse(any(c("ranking", "rankingEstimate") %in% names), names[3], names[2]))
+                
+                tooltip <- bsTooltip(id = "visualize_conf", 
+                                     title = "Output types: rankingEstimate (Orders genetic mutations using the agony algorithm), poset (Shows all possible causal paths between genes in the ranking), DAG (Highlights significant relationships and repeated patterns of evolution among genetic mutations)",
+                                     placement = "right", 
+                                     trigger = "hover",
+                                     options = list(container = "body", html = TRUE))
+                tagList(select_input, tooltip)
                 })
               }
             }
@@ -1406,33 +1617,37 @@ server <- function(input, output, session) {
       if (ncol(data) == 3) {
         if (colnames(data)[1] =="SAMPLE" & colnames(data)[2] =="GENE" &
             colnames(data)[3] =="CCF") {
-          default_values_load_new_genotype()
-          case("bulk_single")
-          data <- distinct(data, SAMPLE, GENE, .keep_all = TRUE)
-          reshaped_data(
-            acast(data, SAMPLE ~ GENE, value.var = "CCF", fill = 0)
-          )
-          
-          output$binarization <- renderUI({
-            tagList(
-              div(style = "display: flex; align-items: center;",
-                  numericInput("binarization", 
-                               label = span("Filter to binarize ", 
-                                            tags$i(id = "helpIcon3", 
-                                                   class = "fa fa-question-circle", 
-                                                   style="margin-left: 5px;")), 
-                               value = 1, min = 0, max = 1, step = 0.01),
-                  bsTooltip(id = "helpIcon3", 
-                            title = "Specify which threshold you want to use as a filter to binarize the database to be inputted into the next inference phase.", 
-                            placement = "right", trigger = "hover")
-              )
+          if (input$data_type != "Bulk single") {
+            showNotification("Select the correct file", type = "error")
+            updateSelectInput(session, "data_type", selected = "Select data type")
+          } else {
+
+            default_values_load_new_genotype()
+            output$directoryInput <- renderUI(NULL)
+            case("bulk_single")
+            data <- distinct(data, SAMPLE, GENE, .keep_all = TRUE)
+            reshaped_data(
+              acast(data, SAMPLE ~ GENE, value.var = "CCF", fill = 0)
             )
-          })
-          output$switchViewBtn <- renderUI({
-            actionButton("switchViewBtn", "Switch View", class = "custom-button")
-          })
-          
-          bulk_single_case()
+            
+            output$binarization <- renderUI({
+              tagList(
+                div(style = "display: flex; align-items: center;",
+                    numericInput("binarization", 
+                                 label = span("CCF threshold", 
+                                              tags$i(id = "helpIcon3", 
+                                                     class = "fa fa-question-circle", 
+                                                     style="margin-left: 5px;")), 
+                                 value = 0.05, min = 0, max = 1, step = 0.01),
+                    bsTooltip(id = "helpIcon3", 
+                              title = "Specify which threshold you want to use to binarize CCF data.", 
+                              placement = "right", trigger = "hover")
+                )
+              )
+            })
+            
+            bulk_single_case()
+          }
         } else {
           showNotification("File not recognized. Make sure the column names are correct.", 
                            type = "error")
@@ -1441,178 +1656,162 @@ server <- function(input, output, session) {
       } else if (ncol(data) == 4) {   #### Bulk multipla biopsia o single cell 
         if (colnames(data)[1]=="SAMPLE" & colnames(data)[2]=="REGION" &
             colnames(data)[3]=="GENE" & colnames(data)[4]=="CCF") {
-          default_values_load_new_genotype()
-          
-          case("bulk_multiple")
-          # Remove duplicates by keeping only the first occurrence for each position
-          data <- distinct(data, SAMPLE, REGION, GENE, .keep_all = TRUE)
-          
-          reshaped_data(
-            data %>%
-              group_by(SAMPLE, REGION, GENE) %>%
-              summarise(CCF = sum(CCF)) %>%
-              unite("ID", c("SAMPLE", "REGION"), sep = "\t") %>%
-              pivot_wider(names_from = GENE, values_from = CCF, values_fill = 0) %>%
-              dplyr::select(-ID, everything()) %>% 
-              column_to_rownames(var = "ID")
-          )
-          
-          modified_data <- reshaped_data()
-          output$DeleteColumn <- render_delete_column_ui("DeleteColumn", 
-                                                         "Delete column", 
-                                                         reshaped_data())
-          output$DeleteRow <- render_delete_row_ui("DeleteRow", 
-                                                   "Delete row", 
-                                                   reshaped_data())
-          
-          observe({
-            modified_data <- modify_reshaped_data(modified_data)
-            output$dataTable <- renderDT({
-              datatable(modified_data, options = list(scrollX = TRUE), 
-                        selection ="single")
+          if (input$data_type != "Bulk multiple") {
+            showNotification("Select the correct file", type = "error")
+            updateSelectInput(session, "data_type", selected = "Select data type")
+          } else {
+            default_values_load_new_genotype()
+            output$dataTable2 <- NULL
+            output$loadBtn2 <- renderUI(NULL)
+            
+            case("bulk_multiple")
+            # Remove duplicates by keeping only the first occurrence for each position
+            data <- distinct(data, SAMPLE, REGION, GENE, .keep_all = TRUE)
+            
+            reshaped_data(
+              data %>%
+                group_by(SAMPLE, REGION, GENE) %>%
+                summarise(CCF = sum(CCF)) %>%
+                unite("ID", c("SAMPLE", "REGION"), sep = "\t") %>%
+                pivot_wider(names_from = GENE, values_from = CCF, values_fill = 0) %>%
+                dplyr::select(-ID, everything()) %>% 
+                column_to_rownames(var = "ID")
+            )
+            
+            modified_data <- reshaped_data()
+            output$DeleteColumn <- render_delete_column_ui("DeleteColumn", 
+                                                           "Remove DNA alterations (column)", 
+                                                           reshaped_data())
+            output$DeleteRow <- render_delete_row_ui("DeleteRow", 
+                                                     "Remove samples (row)", 
+                                                     reshaped_data())
+            
+            observe({
+              modified_data <- modify_reshaped_data(modified_data)
+              output$dataTable <- renderDT({
+                datatable(modified_data, options = list(scrollX = TRUE), 
+                          selection ="single")
+              })
+              reshaped_data(modified_data)
+              output$heatmapPlot <- renderUI({
+                generate_heatmap_plot(modified_data)
+              })
             })
-            reshaped_data(modified_data)
-            output$heatmapPlot <- renderUI({
-              generate_heatmap_plot(modified_data)
+            
+            output$binarization <- renderUI({
+              tagList(
+                div(style = "display: flex; align-items: center;",
+                    numericInput("binarization", 
+                                 label = span("CCF threshold", 
+                                              tags$i(id = "helpIcon3", 
+                                                     class = "fa fa-question-circle", 
+                                                     style="margin-left: 5px;")), 
+                                 value = 0.05, min = 0, max = 1, step = 0.01),
+                    bsTooltip(id = "helpIcon3", 
+                              title = "Specify which threshold you want to use to binarize CCF data.", 
+                              placement = "right", trigger = "hover")
+                )
+              )
             })
-          })
-          
-          output$binarization <- renderUI({
-            tagList(
-              div(style = "display: flex; align-items: center;",
-                  numericInput("binarization", 
-                               label = span("Filter to binarize ", 
-                                            tags$i(id = "helpIcon3", 
-                                                   class = "fa fa-question-circle", 
-                                                   style="margin-left: 5px;")), 
-                               value = 1, min = 0, max = 1, step = 0.01),
-                  bsTooltip(id = "helpIcon3", 
-                            title = "Specify which threshold you want to use as a filter to binarize the database to be inputted into the next inference phase.", 
-                            placement = "right", trigger = "hover")
+            
+            
+            output$binarization_perc <- renderUI({
+              tagList(
+                div(style = "display: flex; align-items: center;",
+                    numericInput("binarization_perc", 
+                                 label = span("Prevalence threshold", 
+                                              tags$i(id = "helpIcon4", 
+                                                     class = "fa fa-question-circle", 
+                                                     style="margin-left: 5px;")), 
+                                 value = 0.00, min = 0, max = 1, step = 0.01),
+                    bsTooltip(id = "helpIcon4", 
+                              title = "Specify which threshold you want to use to binarize percentage in each sample.", 
+                              placement = "right", trigger = "hover")
+                )
               )
-            )
-          })
-          
-          output$switchViewBtn <- renderUI({
-            actionButton("switchViewBtn", "Switch View", class = "custom-button")
-          })
-          
-          output$binarization_perc <- renderUI({
-            tagList(
-              div(style = "display: flex; align-items: center;",
-                  numericInput("binarization_perc", 
-                               label = span("Filter to binarize percentage ", 
-                                            tags$i(id = "helpIcon4", 
-                                                   class = "fa fa-question-circle", 
-                                                   style="margin-left: 5px;")), 
-                               value = 1, min = 0, max = 1, step = 0.01),
-                  bsTooltip(id = "helpIcon4", 
-                            title = "Specify the threshold you want to use as a filter to binarize the percentage of mutated regions in each sample of the database to be inputted into the next inference phase.", 
-                            placement = "right", trigger = "hover")
-              )
-            )
-          })
-          
-          handle_dataTable_cell_clicked(reshaped_data(), "ID")
-          
-          output$directoryInput <- renderUI({
-            tagList(
-              div(style = "display: flex; align-items: center; gap: 5px;",
-                  shinyDirButton("dir", "Select a folder", title = "Select a folder", 
-                                 multiple = FALSE),
-                  tags$i(id = "helpIconFolder", class = "fa fa-question-circle", 
-                         style="cursor: pointer;", `data-toggle`="tooltip", 
-                         `data-placement`="right",
-                         title="To perform the inference operation, it's necessary to select the folder containing the files corresponding to each row of the database along with its respective Directed Acyclic Graph (DAG).")
-              )
-            )
-          })
-          
-          observe({
-            req(input$dir)
-            selected_folder(parseDirPath(c(wd = getwd()), input$dir))
-          })
-          
-          shinyDirChoose(input, "dir", roots = c(wd = getwd()), 
-                         filetypes = c("", "txt"))
+            })
+            
+            handle_dataTable_cell_clicked(reshaped_data(), "ID")
+            
+            observe({
+              req(input$dir)
+              selected_folder(parseDirPath(c(wd = getwd()), input$dir))
+            })
+            
+            shinyDirChoose(input, "dir", roots = c(wd = getwd()), 
+                           filetypes = c("", "txt"))
+          }
           
         } else if (colnames(data)[1]=="PATIENT" & colnames(data)[2]=="CELL" &
                     colnames(data)[3]=="GENE" & colnames(data)[4]=="VALUE") {
-          default_values_load_new_genotype()
-          case("single_cell")
-          # Remove duplicates by keeping only the first occurrence for each position
-          data <- distinct(data, PATIENT, CELL, GENE, .keep_all = TRUE)
-          
-          data <- data %>%
-            group_by(PATIENT, GENE) %>%
-            summarise(PERCENTAGE = mean(VALUE)) %>%
-            pivot_wider(names_from = GENE, values_from = PERCENTAGE, 
-                        values_fill = list(PERCENTAGE = 0))
-          
-          reshaped_data(data %>%
-                          column_to_rownames(var = "PATIENT"))
-          
-          output$DeleteColumn <- render_delete_column_ui("DeleteColumn", 
-                                                         "Delete column", 
-                                                         reshaped_data())
-          
-          output$DeleteRow <- render_delete_row_ui("DeleteRow", 
-                                                   "Delete row", 
-                                                   reshaped_data())
-          
-          observe({
-            modified_data <- modify_reshaped_data(reshaped_data())
-            output$dataTable <- renderDT({
-              datatable(modified_data, options = list(scrollX = TRUE), 
-                        selection ="single")
+          if (input$data_type != "Single cell") {
+            showNotification("Select the correct file", type = "error")
+            updateSelectInput(session, "data_type", selected = "Select data type")
+          } else {  
+            default_values_load_new_genotype()
+            output$dataTable2 <- NULL
+            output$loadBtn2 <- renderUI(NULL)
+            case("single_cell")
+            # Remove duplicates by keeping only the first occurrence for each position
+            data <- distinct(data, PATIENT, CELL, GENE, .keep_all = TRUE)
+            
+            data <- data %>%
+              group_by(PATIENT, GENE) %>%
+              summarise(PERCENTAGE = mean(VALUE)) %>%
+              pivot_wider(names_from = GENE, values_from = PERCENTAGE, 
+                          values_fill = list(PERCENTAGE = 0))
+            
+            reshaped_data(data %>%
+                            column_to_rownames(var = "PATIENT"))
+            
+            output$DeleteColumn <- render_delete_column_ui("DeleteColumn", 
+                                                           "Remove DNA alterations (column)", 
+                                                           reshaped_data())
+            
+            output$DeleteRow <- render_delete_row_ui("DeleteRow", 
+                                                     "Remove samples (row)", 
+                                                     reshaped_data())
+            
+            observe({
+              modified_data <- modify_reshaped_data(reshaped_data())
+              output$dataTable <- renderDT({
+                datatable(modified_data, options = list(scrollX = TRUE), 
+                          selection ="single")
+              })
+              reshaped_data(modified_data)
+              output$heatmapPlot <- renderUI({
+                generate_heatmap_plot(reshaped_data())
+              })
             })
-            reshaped_data(modified_data)
-            output$heatmapPlot <- renderUI({
-              generate_heatmap_plot(reshaped_data())
+            
+            output$binarization <- renderUI({
+              tagList(
+                div(style = "display: flex; align-items: center;",
+                    numericInput("binarization", 
+                                 label = span("CCF threshold", 
+                                              tags$i(id = "helpIcon3", 
+                                                     class = "fa fa-question-circle", 
+                                                     style="margin-left: 5px;")), 
+                                 value = 0.05, min = 0, max = 1, step = 0.01),
+                    bsTooltip(id = "helpIcon3", 
+                              title = "Specify which threshold you want to use to binarize CCF data.", 
+                              placement = "right", trigger = "hover")
+                )
+              )
             })
-          })
-          
-          output$binarization <- renderUI({
-            tagList(
-              div(style = "display: flex; align-items: center;",
-                  numericInput("binarization", 
-                               label = span("Filter to binarize ", 
-                                            tags$i(id = "helpIcon3", 
-                                                   class = "fa fa-question-circle", 
-                                                   style="margin-left: 5px;")), 
-                               value = 1, min = 0, max = 1, step = 0.01),
-                  bsTooltip(id = "helpIcon3", 
-                            title = "Specify which threshold you want to use as a filter to binarize the database to be inputted into the next inference phase.", 
-                            placement = "right", trigger = "hover")
-              )
-            )
-          })
-          output$switchViewBtn <- renderUI({
-            actionButton("switchViewBtn", "Switch View", class = "custom-button")
-          })
-          
-          handle_dataTable_cell_clicked(reshaped_data(), "PATIENT")
-          
-          output$directoryInput <- renderUI({
-            tagList(
-              div(style = "display: flex; align-items: center; gap: 5px;",
-                  shinyDirButton("dir", "Select a folder", title = "Select a folder", 
-                                 multiple = FALSE),
-                  tags$i(id = "helpIconFolder", class = "fa fa-question-circle", 
-                         style="cursor: pointer;", `data-toggle`="tooltip", 
-                         `data-placement`="right",
-                         title="To perform the inference operation, it's necessary to select the folder containing the files corresponding to each row of the database along with its respective Directed Acyclic Graph (DAG).")
-              )
-            )
-          })
-          
-          observe({
-            req(input$dir)
-            selected_folder(parseDirPath(c(wd = getwd()), input$dir))
-          })
-          
-          shinyDirChoose(input, "dir", roots = c(wd = getwd()), 
-                         filetypes = c("", "txt"))
+  
+            
+            handle_dataTable_cell_clicked(reshaped_data(), "PATIENT")
+            
+            
+            observe({
+              req(input$dir)
+              selected_folder(parseDirPath(c(wd = getwd()), input$dir))
+            })
+            
+            shinyDirChoose(input, "dir", roots = c(wd = getwd()), 
+                           filetypes = c("", "txt"))
+          }
           
         } else {
           showNotification("File not recognized. Make sure the column names are correct.", 
@@ -1657,12 +1856,12 @@ server <- function(input, output, session) {
     }
   }
   
+
   # Inference btn
   observeEvent(input$submitBtn, {
     default_values_inference()
     filter <- input$binarization
     filter_perc <- input$binarization_perc
-
     
     # filter the genotype table according to the case
     if (is.null(case())) {
@@ -1680,6 +1879,18 @@ server <- function(input, output, session) {
       showNotification("Fill in all fields", type = "error")
     }
     else {
+      
+      # Apri il modal di calcolo in corso
+      modal_session <- showModal(modalDialog(
+        title = "Processing",
+        div(
+          style = "text-align: center;",
+          tags$i(class = "fa fa-hourglass-half fa-spin fa-1x fa-fw"),
+          p("Calculation in progress. Please wait...")
+        ),
+        easyClose = FALSE,
+        footer = NULL
+      ))
       binarize_table(filter, filter_perc, reshaped_data_matrix())
       updateTabItems(session, "sidebarMenu", "inference")
       
@@ -1688,156 +1899,152 @@ server <- function(input, output, session) {
       #inference function
       if (!is.null(case()) && !is.na(filter)) {
         tryCatch({
-          
-          nsampling <- input$nresampling
-          set.seed(input$seed)
-          if(case()=="bulk_single") {
-            column <- intersect(colnames(genotype_table()), colnames(reshaped_data()))
-            row <- intersect(rownames(genotype_table()), rownames(reshaped_data()))
-            reshaped_data_inference(subset(reshaped_data(), rownames(reshaped_data()) %in% row, select = column))
-            if (input$resamplingFlag == FALSE) {
-              
-              progress <- withProgress(
-                message = 'Ongoing calculation...',
-                detail = 'This may take some time...',
-                value = 0, {
-                  res <- asceticCCF(
-                    dataset = genotype_table(),
-                    ccfDataset = reshaped_data_inference(),
-                    regularization = input$regularization,
-                    command = input$command, 
-                    restarts = input$restarts
-                  )
-                }
-              )
-            } else {
-              progress <- withProgress(
-                message = 'Ongoing calculation...',
-                detail = 'This may take some time...',
-                value = 0, {
-                  res <- asceticCCFResampling(
-                    dataset = genotype_table(),
-                    ccfDataset = reshaped_data_inference(),
-                    vafDataset = reshaped_data2(),
-                    nsampling = nsampling,
-                    regularization = input$regularization,
-                    command = input$command, 
-                    restarts = input$restarts
-                  )
-                }
-              )
-            }
-          }
-          else if((case()=="bulk_multiple" && !is.na(filter_perc))|| case() == "single_cell") {
-            models <- readMatrixFiles(selected_folder())
-            models_filtrati_dati <- models
-            if (!is.null(input$DeleteRow)) {
-              modelli_da_rimuovere <- unlist(strsplit(input$DeleteRow, ","))
-              models_filtrati <- setdiff(names(models), modelli_da_rimuovere)
-              models_filtrati_dati <- models[models_filtrati]
-            }
-            
-            if (!is.null(input$DeleteColumn)) {
-              for (modello in names(models_filtrati_dati)) {
-                file_data <- models_filtrati_dati[[modello]]
-                file_data <- as.data.frame(file_data)
+            nsampling <- input$nresampling
+            set.seed(input$seed)
+            if(case()=="bulk_single") {
+              column <- intersect(colnames(genotype_table()), colnames(reshaped_data()))
+              row <- intersect(rownames(genotype_table()), rownames(reshaped_data()))
+              reshaped_data_inference(subset(reshaped_data(), rownames(reshaped_data()) %in% row, select = column))
+              if (input$resamplingFlag == FALSE) {
                 
-                if (length(input$DeleteColumn) > 0) {
-                  for (col in input$DeleteColumn) {
-                    if (col %in% colnames(file_data)) {
-                      col_index <- which(colnames(file_data) == col)
-                      
-                      # nodo foglia
-                      if (any(file_data[, col_index] == 1) && all(file_data[col_index, -col_index] == 0)) {
-                        file_data[file_data[, col_index] == 1, col_index] <- 0
-                      }
-                      
-                      # nodo radice
-                      if (any(file_data[col_index, -col_index] == 1) && all(file_data[, col_index] == 0)) {
-                        file_data[col_index, -col_index][file_data[col_index, -col_index] == 1] <- 0
-                      }
-                      
-                      # nodo interno
-                      if (any(file_data[, col_index] == 1) && any(file_data[col_index, -col_index] == 1)) {
-                        indici_riga <- which(file_data[, col_index] == 1)
-                        for (indice in indici_riga) {
-                          file_data[indice, -col_index] <- file_data[indice, -col_index] | file_data[col_index, -col_index]
-                        }
-                        file_data[indici_riga, col_index] <- 0
-                        file_data[col_index, -col_index] <- 0
-                      }
-                      file_data <- file_data[-col_index, -col_index]
-                    }
-                  }
-                }
-                file_data <- as.matrix(file_data)
-                models_filtrati_dati[[modello]] <- file_data
+                res <- asceticCCF(
+                  dataset = genotype_table(),
+                  ccfDataset = reshaped_data_inference(),
+                  regularization = input$regularization,
+                  command = input$command, 
+                  restarts = input$restarts
+                )
+                
+              } else {
+                
+                res <- asceticCCFResampling(
+                  dataset = genotype_table(),
+                  ccfDataset = reshaped_data_inference(),
+                  vafDataset = reshaped_data2(),
+                  nsampling = nsampling,
+                  regularization = input$regularization,
+                  command = input$command, 
+                  restarts = input$restarts
+                )
+                
               }
             }
-            
-            if (is.null(selected_folder())) {
-              showNotification("Select the folder in the previous step", type = "error")
-            } else if (input$resamplingFlag == FALSE) {
+            else if((case()=="bulk_multiple" && !is.na(filter_perc))|| case() == "single_cell") {
+              models <- readMatrixFiles(selected_folder())
+              models_filtrati_dati <- models
+              if (!is.null(input$DeleteRow)) {
+                modelli_da_rimuovere <- unlist(strsplit(input$DeleteRow, ","))
+                models_filtrati <- setdiff(names(models), modelli_da_rimuovere)
+                models_filtrati_dati <- models[models_filtrati]
+              }
               
-              progress <- withProgress(
-                message = 'Ongoing calculation...',
-                detail = 'This may take some time...',
-                value = 0, {
-                  res <- asceticPhylogenies(
-                    dataset = genotype_table(),
-                    models = models_filtrati_dati,
-                    regularization = input$regularization,
-                    command = input$command,
-                    restarts = input$restarts
-                  )
+              if (!is.null(input$DeleteColumn)) {
+                for (modello in names(models_filtrati_dati)) {
+                  file_data <- models_filtrati_dati[[modello]]
+                  file_data <- as.data.frame(file_data)
+                  
+                  if (length(input$DeleteColumn) > 0) {
+                    for (col in input$DeleteColumn) {
+                      if (col %in% colnames(file_data)) {
+                        col_index <- which(colnames(file_data) == col)
+                        
+                        # nodo foglia
+                        if (any(file_data[, col_index] == 1) && all(file_data[col_index, -col_index] == 0)) {
+                          file_data[file_data[, col_index] == 1, col_index] <- 0
+                        }
+                        
+                        # nodo radice
+                        if (any(file_data[col_index, -col_index] == 1) && all(file_data[, col_index] == 0)) {
+                          file_data[col_index, -col_index][file_data[col_index, -col_index] == 1] <- 0
+                        }
+                        
+                        # nodo interno
+                        if (any(file_data[, col_index] == 1) && any(file_data[col_index, -col_index] == 1)) {
+                          indici_riga <- which(file_data[, col_index] == 1)
+                          for (indice in indici_riga) {
+                            file_data[indice, -col_index] <- file_data[indice, -col_index] | file_data[col_index, -col_index]
+                          }
+                          file_data[indici_riga, col_index] <- 0
+                          file_data[col_index, -col_index] <- 0
+                        }
+                        file_data <- file_data[-col_index, -col_index]
+                      }
+                    }
+                  }
+                  file_data <- as.matrix(file_data)
+                  models_filtrati_dati[[modello]] <- file_data
                 }
-              )
-            } else {
+              }
               
-              progress <- withProgress(
-                message = 'Ongoing calculation...',
-                detail = 'This may take some time...',
-                value = 0, {
-                  res <- asceticPhylogeniesBootstrap(
-                    dataset = genotype_table(),
-                    models = models_filtrati_dati,
-                    nsampling = nsampling,
-                    regularization = input$regularization,
-                    command = input$command,
-                    restarts = input$restarts
-                  )
-                }
-              )
+              if (is.null(selected_folder())) {
+                showNotification("Select the folder in the previous step", type = "error")
+              } else if (input$resamplingFlag == FALSE) {
+                
+                
+                res <- asceticPhylogenies(
+                  dataset = genotype_table(),
+                  models = models_filtrati_dati,
+                  regularization = input$regularization,
+                  command = input$command,
+                  restarts = input$restarts
+                )
+                
+              } else {
+                
+                
+                res <- asceticPhylogeniesBootstrap(
+                  dataset = genotype_table(),
+                  models = models_filtrati_dati,
+                  nsampling = nsampling,
+                  regularization = input$regularization,
+                  command = input$command,
+                  restarts = input$restarts
+                )
+                
+              }
             }
-          }
-          else {
-            showNotification("Enter a valid value in the percentage binarization field in the previous step", type = "error")
-          }
-          resampling_res(res)
-          
-          if(!is.null(res)) {
+            else {
+              showNotification("Enter a valid value in the percentage binarization field in the previous step", type = "error")
+            }
+            resampling_res(res)
             
-            names_to_remove <- c("dataset", "models", "ccfDataset", "inference")
-            names <- setdiff(names(res), names_to_remove)
-            names <- c(names, names(res$inference))
-            visualizeInferenceOutput(TRUE)
-            output$visualize_inference <- renderUI({selectInput("visualize_inference", 
-                                                                "Output inference", 
-                                                                c(names),
-                                                                selected = "poset")})
-          }
+            if(!is.null(res)) {
+              
+              names_to_remove <- c("dataset", "models", "ccfDataset", "inference")
+              names <- setdiff(names(res), names_to_remove)
+              names <- c(names, names(res$inference))
+              visualizeInferenceOutput(TRUE)
+              output$visualize_inference <- renderUI({
+                select_input <- selectInput("visualize_inference", 
+                                            "Select your output", 
+                                            c(names),
+                                            selected = ifelse("rankingEstimate" %in% names, names[3], names[2]))
+                
+                
+                tooltip <- bsTooltip(id = "visualize_inference", 
+                                     title = "Output types: rankingEstimate (Orders genetic mutations using the agony algorithm), poset (Shows all possible causal paths between genes in the ranking), DAG (Highlights significant relationships and repeated patterns of evolution among genetic mutations)",
+                                     placement = "right", 
+                                     trigger = "hover",
+                                     options = list(container = "body", html = TRUE))
+                
+                tagList(select_input, tooltip)
+              })
+            }
+
+          removeModal()
         }, error = function(e) {
           visualizeInferenceOutput(FALSE)
           output$visualize_inference <- NULL
           output$selected_result_output <- NULL
           output$graph_inference <- NULL
           showNotification("Select the correct folder in the previous step", type = "error")
+          removeModal()
         })
       }
     }
   })
-  
   # Callback function to handle click on input resamplingFlag
+  
   observeEvent(input$resamplingFlag, {
     # Check whether the resampling flag has been activated.
     if (input$resamplingFlag) {
@@ -1847,11 +2054,35 @@ server <- function(input, output, session) {
                                !is.null(reshaped_data2()))) {
         if (!is.null(nresampling())) {
           output$nresampling <- renderUI({
-            numericInput("nresampling", "Number of samplings", value = nresampling(), min = 3)
+            tagList(
+              div(style = "display: flex; align-items: center;",
+                  numericInput("nresampling", 
+                               label = span("Number of samplings", 
+                                            tags$i(id = "helpIconNresampling", 
+                                                   class = "fa fa-question-circle", 
+                                                   style = "margin-left: 5px;")),
+                               value = nresampling(), min = 3),
+                  bsTooltip(id = "helpIconNresampling", 
+                            title = "A higher resampling number requires more computational time.", 
+                            placement = "right", trigger = "hover")
+              )
+            )
           })
         } else {
           output$nresampling <- renderUI({
-            numericInput("nresampling", "Number of samplings", value = 3, min = 3)
+            tagList(
+              div(style = "display: flex; align-items: center;",
+                  numericInput("nresampling", 
+                               label = span("Number of samplings", 
+                                            tags$i(id = "helpIconNresampling", 
+                                                   class = "fa fa-question-circle", 
+                                                   style = "margin-left: 5px;")),
+                               value = 10, min = 3),
+                  bsTooltip(id = "helpIconNresampling", 
+                            title = "A higher resampling number requires more computational time.", 
+                            placement = "right", trigger = "hover")
+              )
+            )
           })
         }
       } else {
@@ -1873,6 +2104,7 @@ server <- function(input, output, session) {
     res <- resampling_res()
     output$selected_result_output <- NULL
     col_names <- colnames(res$dataset)
+    col_names(col_names)
     
     if(visualizeInferenceOutput()) {
       if (input$visualize_inference %in% names(res)) {
@@ -1887,17 +2119,31 @@ server <- function(input, output, session) {
         selected_result[, "rank"] <- as.integer(selected_result[, "rank"]) + 1
         colnames(selected_result)[1] <- "genes"
         rownames(selected_result) <- NULL
-        reactive_selected_result (selected_result)
+        reactive_selected_result(selected_result)
         output$selected_result_output <- renderDT({
-          datatable(reactive_selected_result(), options = list(scrollX = TRUE), rownames = FALSE, selection = "single")
+          datatable(reactive_selected_result(), 
+                    options = list(
+                      scrollX = TRUE, 
+                      order = list(list(1, 'asc'), list(0, 'asc')),
+                      columnDefs = list(
+                        list(className = 'dt-body-right', targets = c(0, 1))  
+                      )
+                    ),
+                    rownames = FALSE, selection = "single", 
+                    colnames = c('Genes', 'Rank'))
         })
-      } else if (input$visualize_inference == "poset"){
+      }
+      else if (input$visualize_inference == "poset"){
         colnames(selected_result) <- col_names
         rownames(selected_result) <- col_names
         output$graph_inference <- NULL
         reactive_selected_result (selected_result)
         output$selected_result_output <- renderDT({
-          datatable(reactive_selected_result(), options = list(scrollX = TRUE), rownames = TRUE, selection = "single")
+          data <- reactive_selected_result()
+          data <- as.data.frame(data)
+          data <- data[ , sort(names(data))]
+          data <- data[order(row.names(data)), ]
+          datatable(data, options = list(scrollX = TRUE), rownames = TRUE, selection = "single")
         })
       } else {
         colnames(selected_result) <- col_names
@@ -1908,7 +2154,6 @@ server <- function(input, output, session) {
         } else {
           reactive_selected_result(selected_result)
           grafo <- graph_from_adjacency_matrix(selected_result)
-          
           output$graph_inference <- renderVisNetwork({
             nodi_da_rimuovere <- V(grafo)[degree(grafo, mode = "in") == 0 & 
                                             degree(grafo, mode = "out") == 0]
@@ -1932,14 +2177,23 @@ server <- function(input, output, session) {
   observeEvent(input$submitBtn_confEstimation, {
     if (is.null(resampling_res())) {
       showNotification("Perform the inference phase first", type = "message")
-    } 
-    else if (is.null(case())) {
+    } else if (is.null(case())) {
       showNotification("Upload the genomic file in the previous step", type = "error")
-    }
-    else if (is.null(input$iteration_confEstimation) || ((input$resamplingFlag_conf == TRUE) && (is.null(input$nresampling_conf)))){
+    } else if (is.na(input$iteration_confEstimation)) {
       showNotification("Fill in all fields", type = "error")
-    }
-    else{
+    } else if (input$resamplingFlag_conf == TRUE && is.na(input$nresampling_conf)) {
+      showNotification("Fill in all fields", type = "error")
+    } else {
+      modal_session <- showModal(modalDialog(
+        title = "Processing",
+        div(
+          style = "text-align: center;",
+          tags$i(class = "fa fa-hourglass-half fa-spin fa-1x fa-fw"),
+          p("Calculation in progress. Please wait...")
+        ),
+        easyClose = FALSE,
+        footer = NULL
+      ))
       if(case()=="bulk_single") {
         if(input$resamplingFlag_conf == FALSE) {
           res <- asceticCCFAssessment(
@@ -1978,11 +2232,23 @@ server <- function(input, output, session) {
         names <- setdiff(names(res), names_to_remove)
         names <- c(names, names(res$inference))
         visualizeConfidenceOutput(TRUE)
-        output$visualize_conf <- renderUI({selectInput("visualize_conf", 
-                                                       "Output confidence", 
-                                                       c(names),
-                                                       selected = "poset")})
+        
+        output$visualize_conf <- renderUI({
+          select_input <- selectInput("visualize_conf", 
+                                      "Select your output", 
+                                      c(names),
+                                      selected = ifelse(any(c("ranking", "rankingEstimate") %in% names), names[3], names[2]))
+          
+          tooltip <- bsTooltip(id = "visualize_conf", 
+                               title = "Output types: rankingEstimate (Orders genetic mutations using the agony algorithm), poset (Shows all possible causal paths between genes in the ranking), DAG (Highlights significant relationships and repeated patterns of evolution among genetic mutations)",
+                               placement = "right", 
+                               trigger = "hover",
+                               options = list(container = "body", html = TRUE))
+          
+          tagList(select_input, tooltip)
+        })
       }
+      removeModal()
     }
   })
   
@@ -1992,7 +2258,11 @@ server <- function(input, output, session) {
     req(input$visualize_conf)
     res <- conf_res()
     output$selected_result_output_conf <- NULL
-    col_names <- colnames(res$dataset)
+    col_names <- col_names()
+    
+    res_inf <- resampling_res()
+    res_inf <- res_inf$rankingEstimate
+    
     
     if(visualizeConfidenceOutput()) {
       if (input$visualize_conf %in% names(res)) {
@@ -2000,20 +2270,28 @@ server <- function(input, output, session) {
       } else {
         selected_result <- res$inference[[input$visualize_conf]]
       }
+
       if (input$visualize_conf == "rankingEstimate" | input$visualize_conf == "ranking") {
         output$graph_conf <- NULL
         selected_result <- res[["ranking"]]
         ranking_df <- as.data.frame(selected_result)
-        ranking_df <- data.frame(genes = rownames(ranking_df), 
-                                 rank = ranking_df$selected_result)
+        ranking_df <- data.frame(Genes = rownames(ranking_df), 
+                                 Rank_sampling = ranking_df$selected_result,
+                                 Rank = as.integer(res_inf[, "rank"]) + 1,
+                                 stringsAsFactors = FALSE)
         
+        ranking_df <- ranking_df %>%
+          arrange(Rank_sampling, Rank, Genes)
+
         reactive_selected_result_conf (ranking_df)
         output$selected_result_output_conf <- renderDT({
           datatable(
             reactive_selected_result_conf(),
             options = list(
               scrollX = TRUE,
-              columnDefs = list(list(targets = 1, className = 'dt-body-left'))  
+              columnDefs = list(
+                list(className = 'dt-body-right', targets = c(0, 1, 2))  
+              )
             ),
             rownames = FALSE,
             selection = "single"
@@ -2021,21 +2299,28 @@ server <- function(input, output, session) {
         })
         
       } else if (input$visualize_conf == "poset"){
+        colnames(selected_result) <- col_names
+        rownames(selected_result) <- col_names
         output$graph_conf <- NULL
+        reactive_selected_result (selected_result)
         reactive_selected_result_conf (selected_result)
         output$selected_result_output_conf <- renderDT({
-          datatable(reactive_selected_result_conf(), options = list(scrollX = TRUE),
+          data <- reactive_selected_result()
+          data <- as.data.frame(data)
+          data <- data[ , sort(names(data))]
+          data <- data[order(row.names(data)), ]
+          datatable(data, options = list(scrollX = TRUE),
                     rownames = TRUE, selection = "single")
         })
       } else {
-        
         if (all(selected_result == 0)) {
           showNotification("No DAG available", type = "message")
           output$graph_conf <- NULL
         } else {
+          
           reactive_selected_result_conf(selected_result)
           grafo <- graph_from_adjacency_matrix(selected_result)
-          
+          poset <- if (!is.null(res$poset)) res$poset else NULL
           output$graph_conf <- renderVisNetwork({
             nodi_da_rimuovere <- V(grafo)[degree(grafo, mode = "in") == 0 & 
                                             degree(grafo, mode = "out") == 0]
@@ -2046,7 +2331,7 @@ server <- function(input, output, session) {
             edges <- as_tibble(as_edgelist(grafo))
             colnames(edges) <- c("from", "to")
             
-            generateVisNetwork(nodes, edges, "other", "")
+            generateVisNetwork(nodes, edges, "other", "", poset)
           })
         }
       }
@@ -2064,13 +2349,35 @@ server <- function(input, output, session) {
                                !is.null(reshaped_data2()))) {
         if (!is.null(nresampling_conf())) {
           output$nresampling_conf <- renderUI({
-            numericInput("nresampling_conf", "Number of samplings", 
-                         value = 3, min = 3)
+            tagList(
+              div(style = "display: flex; align-items: center;",
+                  numericInput("nresampling_conf", 
+                               label = span("Number of samplings", 
+                                            tags$i(id = "helpIconNresamplingConf", 
+                                                   class = "fa fa-question-circle", 
+                                                   style = "margin-left: 5px;")),
+                               value = nresampling_conf(), min = 3),
+                  bsTooltip(id = "helpIconNresamplingConf", 
+                            title = "A higher resampling number requires more computational time.", 
+                            placement = "right", trigger = "hover")
+              )
+            )
           })
         } else {
           output$nresampling_conf <- renderUI({
-            numericInput("nresampling_conf", "Number of samplings", 
-                         value = 3, min = 3)
+            tagList(
+              div(style = "display: flex; align-items: center;",
+                  numericInput("nresampling_conf", 
+                               label = span("Number of samplings", 
+                                            tags$i(id = "helpIconNresamplingConf", 
+                                                   class = "fa fa-question-circle", 
+                                                   style = "margin-left: 5px;")),
+                               value = 10, min = 3),
+                  bsTooltip(id = "helpIconNresamplingConf", 
+                            title = "A higher resampling number requires more computational time.", 
+                            placement = "right", trigger = "hover")
+              )
+            )
           })
         }
       } else {
@@ -2186,9 +2493,12 @@ server <- function(input, output, session) {
         all_zero_one <- apply(output_db, 2, function(col) all(col == 0) || all(col == 1))
         if (any(all_zero_one)) {
           removed_cols <- colnames(output_db)[which(all_zero_one)]
-          showNotification(paste("Columns", paste(removed_cols, collapse = " "), 
-                                 "have been removed"), type = "message")
           output_db <- output_db[, !all_zero_one]
+        }
+        
+        if (ncol(output_db) == 0) {
+          showNotification("No valid evolutionary step found", type = "message")
+          return()
         }
 
         output$dataTable_surv <- renderDT({
@@ -2196,7 +2506,36 @@ server <- function(input, output, session) {
                     selection = "single")
         })
         
+        output$heatmap_surv <- renderUI({
+          generate_heatmap_plot(output_db)
+        })
+        
         evo_step(output_db)
+        
+        output$binarization_surv2 <- renderUI({
+          tagList(
+            div(style = "display: flex; align-items: center;",
+                numericInput("binarization_surv2", 
+                             label = span("Percentage threshold ", 
+                                          tags$i(id = "helpBinarization_surv2", 
+                                                 class = "fa fa-question-circle", 
+                                                 style="margin-left: 5px;")), 
+                             value = 0.00, min = 0, max = 1, 
+                             step = 0.01),
+                bsTooltip(id = "helpBinarization_surv2", 
+                          title = "Specify  the percentage of presence that each step must have.", 
+                          placement = "right", trigger = "hover")
+            )
+          )
+        })
+        
+        output$DeleteColumn_surv2 <- render_delete_column_ui("DeleteColumn_surv2", 
+                                                            "Remove evolutionary step (column)", 
+                                                            output_db)
+        output$DeleteRow_surv2 <- render_delete_row_ui("DeleteRow_surv2", 
+                                                      "Remove samples (row)", 
+                                                      output_db)
+        orig_dataSurv(output_db)
       } else {
         showNotification("No DAG available with this regularizer", type = "error")
       }
@@ -2239,34 +2578,44 @@ server <- function(input, output, session) {
       if (ncol(data) == 3) {
         if (colnames(data)[1] =="SAMPLE" & colnames(data)[2] =="GENE" &
             colnames(data)[3] =="CCF") {
-          case_surv("bulk_single")
-          data <- distinct(data, SAMPLE, GENE, .keep_all = TRUE)
-          reshaped_dataSurv(
-            acast(data, SAMPLE ~ GENE, value.var = "CCF", fill = 0)
-          )
           
-          output$dataTable_GenotypeSurv <- renderDT({
-            datatable(reshaped_dataSurv(), options = list(scrollX = TRUE))
-          })
-          
-          output$binarization_surv <- renderUI({
-            tagList(
-              div(style = "display: flex; align-items: center;",
-                  numericInput("binarization_surv", 
-                               label = span("Filter to binarize ", 
-                                            tags$i(id = "helpIcon3", 
-                                                   class = "fa fa-question-circle", 
-                                                   style="margin-left: 5px;")), 
-                               value = 1, min = 0, max = 1, step = 0.01),
-                  bsTooltip(id = "helpIcon3", 
-                            title = "Specify which threshold you want to use as a filter to binarize the database to be inputted into the next inference phase.", 
-                            placement = "right", trigger = "hover")
-              )
+          if (input$data_type_surv != "Bulk single") {
+            showNotification("Select the correct file", type = "error")
+          } else {
+            case_surv("bulk_single")
+            data <- distinct(data, SAMPLE, GENE, .keep_all = TRUE)
+            reshaped_dataSurv(
+              acast(data, SAMPLE ~ GENE, value.var = "CCF", fill = 0)
             )
-          })
-          output$binarization_percSurv <- NULL
-          visualize_del()
-          orig_genotypeSurv(reshaped_dataSurv())
+            
+            output$dataTable_GenotypeSurv <- renderDT({
+              datatable(reshaped_dataSurv(), options = list(scrollX = TRUE))
+            })
+            
+            output$heatmap_GenotypeSurv <- renderUI({
+              generate_heatmap_plot(reshaped_dataSurv())
+            })
+            
+            output$binarization_surv <- renderUI({
+              tagList(
+                div(style = "display: flex; align-items: center;",
+                    numericInput("binarization_surv", 
+                                 label = span("CCF threshold ", 
+                                              tags$i(id = "helpIcon3", 
+                                                     class = "fa fa-question-circle", 
+                                                     style="margin-left: 5px;")), 
+                                 value = 0.05, min = 0, max = 1, 
+                                 step = 0.01),
+                    bsTooltip(id = "helpIcon3", 
+                              title = "Specify which threshold you want to use to binarize CCF data.", 
+                              placement = "right", trigger = "hover")
+                )
+              )
+            })
+            output$binarization_percSurv <- NULL
+            visualize_del()
+            orig_genotypeSurv(reshaped_dataSurv())
+          }
         } else{
           showNotification("File not recognized. Make sure the column names are correct.", 
                            type = "error")
@@ -2275,93 +2624,113 @@ server <- function(input, output, session) {
       else if (ncol(data) == 4) {   
         if (colnames(data)[1]=="SAMPLE" & colnames(data)[2]=="REGION" &
                colnames(data)[3]=="GENE" & colnames(data)[4]=="CCF") {
-          case_surv("bulk_multiple")
-          data <- distinct(data, SAMPLE, REGION, GENE, .keep_all = TRUE)
           
-          reshaped_dataSurv(
-            data %>%
-              group_by(SAMPLE, REGION, GENE) %>%
-              summarise(CCF = sum(CCF)) %>%
-              unite("ID", c("SAMPLE", "REGION"), sep = "\t") %>%
-              pivot_wider(names_from = GENE, values_from = CCF, values_fill = 0) %>%
-              dplyr::select(-ID, everything()) %>% 
-              column_to_rownames(var = "ID")
-          )
-          
-          output$dataTable_GenotypeSurv <- renderDT({
-            datatable(reshaped_dataSurv(), options = list(scrollX = TRUE))
-          })
-          
-          output$binarization_surv <- renderUI({
-            tagList(
-              div(style = "display: flex; align-items: center;",
-                  numericInput("binarization_surv", 
-                               label = span("Filter to binarize ", 
-                                            tags$i(id = "helpIcon3", 
-                                                   class = "fa fa-question-circle", 
-                                                   style="margin-left: 5px;")), 
-                               value = 1, min = 0, max = 1, step = 0.01),
-                  bsTooltip(id = "helpIcon3", 
-                            title = "Specify which threshold you want to use as a filter to binarize the database to be inputted into the next inference phase.", 
-                            placement = "right", trigger = "hover")
-              )
+          if (input$data_type_surv != "Bulk multiple") {
+            showNotification("Select the correct file", type = "error")
+          } else {
+            case_surv("bulk_multiple")
+            data <- distinct(data, SAMPLE, REGION, GENE, .keep_all = TRUE)
+            
+            reshaped_dataSurv(
+              data %>%
+                group_by(SAMPLE, REGION, GENE) %>%
+                summarise(CCF = sum(CCF)) %>%
+                unite("ID", c("SAMPLE", "REGION"), sep = "\t") %>%
+                pivot_wider(names_from = GENE, values_from = CCF, values_fill = 0) %>%
+                dplyr::select(-ID, everything()) %>% 
+                column_to_rownames(var = "ID")
             )
-          })
-          
-          output$binarization_percSurv <- renderUI({
-            tagList(
-              div(style = "display: flex; align-items: center;",
-                  numericInput("binarization_percSurv", 
-                               label = span("Filter to binarize percentage ", 
-                                            tags$i(id = "helpIcon4", 
-                                                   class = "fa fa-question-circle", 
-                                                   style="margin-left: 5px;")), 
-                               value = 1, min = 0, max = 1, step = 0.01),
-                  bsTooltip(id = "helpIcon4", 
-                            title = "Specify the threshold you want to use as a filter to binarize the percentage of mutated regions in each sample of the database to be inputted into the next inference phase.", 
-                            placement = "right", trigger = "hover")
+            
+            output$dataTable_GenotypeSurv <- renderDT({
+              datatable(reshaped_dataSurv(), options = list(scrollX = TRUE))
+            })
+            
+            output$heatmap_GenotypeSurv <- renderUI({
+              generate_heatmap_plot(reshaped_dataSurv())
+            })
+            
+            output$binarization_surv <- renderUI({
+              tagList(
+                div(style = "display: flex; align-items: center;",
+                    numericInput("binarization_surv", 
+                                 label = span("CCF threshold ", 
+                                              tags$i(id = "helpIcon3", 
+                                                     class = "fa fa-question-circle", 
+                                                     style="margin-left: 5px;")), 
+                                 value = 0.05, min = 0, max = 1, 
+                                 step = 0.01),
+                    bsTooltip(id = "helpIcon3", 
+                              title = "Specify which threshold you want to use to binarize CCF data.", 
+                              placement = "right", trigger = "hover")
+                )
               )
-            )
-          })
-          visualize_del()
-          orig_genotypeSurv(reshaped_dataSurv())
+            })
+            
+            output$binarization_percSurv <- renderUI({
+              tagList(
+                div(style = "display: flex; align-items: center;",
+                    numericInput("binarization_percSurv", 
+                                 label = span("Prevalence threshold ", 
+                                              tags$i(id = "helpIcon4", 
+                                                     class = "fa fa-question-circle", 
+                                                     style="margin-left: 5px;")), 
+                                 value = 0.00, min = 0, max = 1, step = 0.01),
+                    bsTooltip(id = "helpIcon4", 
+                              title = "Specify which threshold you want to use to binarize percentage in each sample.", 
+                              placement = "right", trigger = "hover")
+                )
+              )
+            })
+            visualize_del()
+            orig_genotypeSurv(reshaped_dataSurv())
+          }
         }
         else if (colnames(data)[1]=="PATIENT" & colnames(data)[2]=="CELL" &
                          colnames(data)[3]=="GENE" & colnames(data)[4]=="VALUE") {
-          case_surv("single_cell")
-          data <- distinct(data, PATIENT, CELL, GENE, .keep_all = TRUE)
           
-          data <- data %>%
-            group_by(PATIENT, GENE) %>%
-            summarise(PERCENTAGE = mean(VALUE)) %>%
-            pivot_wider(names_from = GENE, values_from = PERCENTAGE, 
-                        values_fill = list(PERCENTAGE = 0))
-          
-          reshaped_dataSurv(data %>%
-                              column_to_rownames(var = "PATIENT"))
-          
-          output$dataTable_GenotypeSurv <- renderDT({
-            datatable(reshaped_dataSurv(), options = list(scrollX = TRUE))
-          })
-          
-          output$binarization_surv <- renderUI({
-            tagList(
-              div(style = "display: flex; align-items: center;",
-                  numericInput("binarization_surv", 
-                               label = span("Filter to binarize ", 
-                                            tags$i(id = "helpIcon3", 
-                                                   class = "fa fa-question-circle", 
-                                                   style="margin-left: 5px;")), 
-                               value = 1, min = 0, max = 1, step = 0.01),
-                  bsTooltip(id = "helpIcon3", 
-                            title = "Specify which threshold you want to use as a filter to binarize the database to be inputted into the next inference phase.", 
-                            placement = "right", trigger = "hover")
+            if (input$data_type_surv != "Single cell") {
+              showNotification("Select the correct file", type = "error")
+            } else {
+            case_surv("single_cell")
+            data <- distinct(data, PATIENT, CELL, GENE, .keep_all = TRUE)
+            
+            data <- data %>%
+              group_by(PATIENT, GENE) %>%
+              summarise(PERCENTAGE = mean(VALUE)) %>%
+              pivot_wider(names_from = GENE, values_from = PERCENTAGE, 
+                          values_fill = list(PERCENTAGE = 0))
+            
+            reshaped_dataSurv(data %>%
+                                column_to_rownames(var = "PATIENT"))
+            
+            output$dataTable_GenotypeSurv <- renderDT({
+              datatable(reshaped_dataSurv(), options = list(scrollX = TRUE))
+            })
+            
+            output$heatmap_GenotypeSurv <- renderUI({
+              generate_heatmap_plot(reshaped_dataSurv())
+            })
+            
+            output$binarization_surv <- renderUI({
+              tagList(
+                div(style = "display: flex; align-items: center;",
+                    numericInput("binarization_surv", 
+                                 label = span("CCF threshold ", 
+                                              tags$i(id = "helpIcon3", 
+                                                     class = "fa fa-question-circle", 
+                                                     style="margin-left: 5px;")), 
+                                 value = 0.05, min = 0, max = 1, 
+                                 step = 0.01),
+                    bsTooltip(id = "helpIcon3", 
+                              title = "Specify which threshold you want to use to binarize CCF data.", 
+                              placement = "right", trigger = "hover")
+                )
               )
-            )
-          })
-          output$binarization_percSurv <- NULL
-          visualize_del()
-          orig_genotypeSurv(reshaped_dataSurv())
+            })
+            output$binarization_percSurv <- NULL
+            visualize_del()
+            orig_genotypeSurv(reshaped_dataSurv())
+            }
         } else {
           showNotification("File not recognized. Make sure the column names are correct.", 
                            type = "error")
@@ -2372,7 +2741,7 @@ server <- function(input, output, session) {
   
   observe({
     req(reshaped_dataSurv())  
-    updated_data <- modify_reshaped_dataSurv(orig_genotypeSurv())
+    updated_data <- modify_reshaped_dataSurv(orig_genotypeSurv(), input$DeleteColumn_surv, input$DeleteRow_surv)
     reshaped_dataSurv(updated_data) 
     
     output$dataTable_GenotypeSurv <- renderDT({
@@ -2382,12 +2751,34 @@ server <- function(input, output, session) {
     updateTextInput(session, "DeleteRow_surv", value = input$DeleteRow_surv)
   })
   
+  observe({
+    req(orig_dataSurv())  
+    updated_data <- modify_reshaped_dataSurv(orig_dataSurv(), input$DeleteColumn_surv2, input$DeleteRow_surv2)
+    evo_step(updated_data) 
+    
+    output$dataTable_surv <- renderDT({
+      datatable(evo_step(), options = list(scrollX = TRUE))
+    })
+    updateTextInput(session, "DeleteColumn_surv2", value = input$DeleteColumn_surv2)
+    updateTextInput(session, "DeleteRow_surv2", value = input$DeleteRow_surv2)
+  })
+  
   # Rendering second genotype table in input survival phase
   output$dataTable_GenotypeSurv <- renderDT({
     req(reshaped_dataSurv())  # Assicura la presenza di dati
     datatable(reshaped_dataSurv(), options = list(scrollX = TRUE))
   })
-
+  
+  observeEvent(input$load_file, {
+    if (input$load_file) {
+      output$data_type_surv <- renderUI({selectInput("data_type_surv", 
+                                           "Select the type of data you want to load", 
+                                           choices = c("Bulk single", "Bulk multiple", "Single cell"))})
+    } else {
+      output$data_type_surv <- renderUI({NULL})
+    }
+  })
+  
   ############################ Output survival  #################################
   
   # Calculation of survival output using ASCETIC function 'evoSigs'
@@ -2395,18 +2786,34 @@ server <- function(input, output, session) {
     if(is.null(evo_step())) {
       showNotification("Calculate the evolutionary step first", type = "message")
     } else {
-      #resExampleEvosigs <- evoSigs( survivalData = surv_data(),
-      #                              evolutionarySteps = evo_step() 
-      #                              )
-      data(amlExample)
-      resExampleEvosigs <- evoSigs( survivalData = amlExample$survival_data,
-                                    evolutionarySteps = amlExample$evolutionary_steps )
+      if (!is.na(input$binarization_surv2) & input$binarization_surv2 != 0 ) {
+        data <- evo_step()
+        threshold <- input$binarization_surv2
+        print(input$binarization_surv2)
+        print(data)
+        cols_to_remove <- sapply(data, function(column) {
+          mean(column == 1) < threshold
+        })
+        print(cols_to_remove)
+        filtered_evoStep <- data[, !cols_to_remove, FALSE]
+        print(ncol(filtered_evoStep))
+      }
       
-      resExampleEvosigs(resExampleEvosigs)
-    
-      visualize_output_surv(resExampleEvosigs)
+      if (ncol(filtered_evoStep) < 1) {
+        showNotification("There are no evolutionary steps with this percentage of presence", type = "warning")
+      } else {
       
-      updateTabItems(session, "sidebarMenu", "output_surv")
+        #resExampleEvosigs <- evoSigs( survivalData = surv_data(),
+        #                              evolutionarySteps = filtered_evoStep 
+        #                              )
+        data(amlExample)
+        resExampleEvosigs <- evoSigs( survivalData = amlExample$survival_data,
+                                      evolutionarySteps = amlExample$evolutionary_steps )
+        
+        resExampleEvosigs(resExampleEvosigs)
+      
+        visualize_output_surv(resExampleEvosigs)
+      }
     }
   })
 
@@ -2441,6 +2848,8 @@ server <- function(input, output, session) {
         saveData(orig_genotypeSurv() , directory_file)
       }
       
+      directory_file <- paste0(directory_complete, "/modified_time.csv")
+      saveData(Sys.time() , directory_file)
 
       directory_file <- paste0(directory_complete, "/surv_data.csv")
       if (!is.null(surv_data())) {
@@ -2457,12 +2866,16 @@ server <- function(input, output, session) {
         values <- c("binarization", "del_col", "del_row", "flag_resampling", 
                     "nresampling", "restarts", "regularization", "command", 
                     "seed", "iteration", "flag_confidence", "nresampling_confidence",  
-                    "reg_surv", "flag_surv", "binarization_surv", "del_col_surv", "del_row_surv", "binarizationPerc_surv")
+                    "reg_surv", "flag_surv", "binarization_surv", "del_col_surv", 
+                    "del_row_surv", "data_type", "data_type_surv", 
+                    "binarization_surv2", "del_col_surv2", "del_row_surv2", "binarizationPerc_surv")
       } else {
         values <- c("binarization", "del_col", "del_row", "flag_resampling", 
                     "nresampling", "restarts", "regularization", "command", 
                     "seed", "iteration", "flag_confidence", "nresampling_confidence",  
-                    "reg_surv", "flag_surv", "binarization_surv", "del_col_surv", "del_row_surv")
+                    "reg_surv", "flag_surv", "binarization_surv", "del_col_surv", 
+                    "del_row_surv", "data_type", "data_type_surv", 
+                    "binarization_surv2", "del_col_surv2", "del_row_surv2")
       }
       sequence <- ifelse((!is.null(input$binarization)), input$binarization, NA)
       sequence <- c(sequence, ifelse((!is.null(input$DeleteColumn)), 
@@ -2499,6 +2912,16 @@ server <- function(input, output, session) {
                                      toString(input$DeleteColumn_surv), NA))
       sequence <- c(sequence, ifelse((!is.null(input$DeleteRow_surv)), 
                                      toString(input$DeleteRow_surv), NA))
+      sequence <- c(sequence, ifelse((!is.null(input$data_type)), 
+                                     toString(input$data_type), NA))
+      sequence <- c(sequence, ifelse((!is.null(input$data_type_surv)), 
+                                     toString(input$data_type_surv), NA))
+      sequence <- c(sequence, ifelse((!is.null(input$binarization_surv2)), 
+                                     toString(input$binarization_surv2), NA))
+      sequence <- c(sequence, ifelse((!is.null(input$DeleteColumn_surv2)), 
+                                     toString(input$DeleteColumn_surv2), NA))
+      sequence <- c(sequence, ifelse((!is.null(input$DeleteRow_surv2)), 
+                                     toString(input$DeleteRow_surv2), NA))
       if ((!is.null(case_surv())) && case_surv() == "bulk_multiple") {
         sequence <- c(sequence, ifelse((!is.null(input$binarization_percSurv)), 
                                        toString(input$binarization_percSurv), NA))
