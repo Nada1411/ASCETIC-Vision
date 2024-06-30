@@ -1,11 +1,11 @@
 "","name","value"
-"1","binarization","0.05"
+"1","binarization","0.5"
 "2","del_col",NA
 "3","del_row",NA
 "4","flag_resampling","0"
 "5","nresampling",NA
 "6","restarts","10"
-"7","regularization","aic"
+"7","regularization","aic, loglik"
 "8","command","hc"
 "9","seed","12345"
 "10","iteration","10"
@@ -14,7 +14,8 @@
 "13","reg_surv","aic"
 "14","flag_surv","FALSE"
 "15","binarization_surv",NA
-"16","del_col_surv",NA
-"17","del_row_surv",NA
-"18","data_type","Bulk single"
-"19","data_type_surv",NA
+"16","data_type","Bulk single"
+"17","data_type_surv",NA
+"18","binarization_surv2","0"
+"19","del_col_surv2",NA
+"20","del_row_surv2",NA

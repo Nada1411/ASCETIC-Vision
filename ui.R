@@ -33,7 +33,7 @@ shinyUI(
           color: #A8FA7F !important; 
         }
         .fa-s {
-          color: #FAEE38 !important; 
+          color: white !important; 
         }
         table.dataTable thead th {
           text-align: right !important;
@@ -44,7 +44,7 @@ shinyUI(
         id = "sidebarMenu",
         menuItem("Home page", tabName = "home", icon = icon("home")),
         menuItem(
-          HTML("Input data (genomic) <span style='float: right; transform: scale(0.6);'><i class='fa fa-i'></i></span>"), 
+          HTML("Input data -Genomic <span style='float: right; transform: scale(0.6);'><i class='fa fa-i'></i></span>"), 
           tabName = "input", 
           icon = icon("database")
         ),
@@ -59,7 +59,7 @@ shinyUI(
           icon = icon("think-peaks")
         ),
         menuItem(
-          HTML("Input data (survival)<span style='float: right; transform: scale(0.55);'><i class='fa fa-s'></i></span>"), 
+          HTML("Input data -Survival<span style='float: right; transform: scale(0.55);'><i class='fa fa-s'></i></span>"), 
           tabName = "input_surv", 
           icon = icon("database")
         ),
@@ -201,7 +201,7 @@ shinyUI(
               column(12,
                      div(
                        style = "display: flex; justify-content: flex-end; margin-top: 20px; margin-bottom: 20px; margin-right: -20px;",
-                       actionButton("inferenceBtn", "Inference", class = "custom-button2")
+                       actionButton("inferenceBtn", "Evolution model inference", class = "custom-button2")
                      ),
                      tags$br(),
                      tags$br(),
@@ -271,14 +271,14 @@ shinyUI(
                      actionButton("submitBtn", "Run", class = "custom-button")
               ),
             ),
+            div(
+              style = "display: flex; justify-content: flex-end; margin-top: 20px; margin-bottom: 20px; margin-right: -20px;",
+              actionButton("confidenceBtn", "Confidence estimation", class = "custom-button2")
+            ),
             fluidPage(
               style = "margin-left: -15px; ",
               fluidRow(
                 column(6,
-                       div(
-                         style = "display: flex; justify-content: flex-end; margin-top: 20px; margin-bottom: 20px; margin-right: -560px;",
-                         actionButton("confidenceBtn", "Confidence estimation", class = "custom-button2")
-                       ),
                        style = "margin-top: 50px;",
                        uiOutput("visualize_inference", class = "custom-width"),
                        conditionalPanel(
@@ -290,7 +290,7 @@ shinyUI(
                        uiOutput("gene_graph_tab", style = "margin-top: 50px;"),
                 ),
                 column(6, 
-                       div(style = "margin-top:105px;", 
+                       div(style = "margin-top:50px;", 
                            conditionalPanel(
                              class = "no-border-bg",
                              condition = "output.visualize_inference != null",
@@ -341,7 +341,7 @@ shinyUI(
                      uiOutput("nresampling_conf", style = "margin-top: 25px;")
               ),
               column(6, 
-                     style = "margin-top: -10px; margin-bottom: 30px;",
+                     style = "margin-bottom: 30px;",
                        numericInput("iteration_confEstimation", "Confidence estimate repetitions", value = 10, min = 3),
                        bsTooltip(id = "iteration_confEstimation", 
                                  title = "A higher number of iterations allows for more precise estimates, although it increases the computational load", 
@@ -351,14 +351,14 @@ shinyUI(
                      actionButton("submitBtn_confEstimation", "Run", class = "custom-button")
               ),
             ),
+            div(
+              style = "display: flex; justify-content: flex-end; margin-top: 20px; margin-bottom: 20px; margin-right: -20px;",
+              actionButton("survBtn", "Input data survival", class = "custom-button2")
+            ),
             fluidPage(
               style = "margin-left: -15px; ",
               fluidRow(
                 column(6,
-                       div(
-                         style = "display: flex; justify-content: flex-end; margin-top: 20px; margin-bottom: 20px; margin-right: -560px;",
-                         actionButton("survBtn", "Input data survival", class = "custom-button2")
-                       ),
                        style = "margin-top: 50px;",
                        uiOutput("visualize_conf", class = "custom-width"),
                        conditionalPanel(
@@ -367,10 +367,10 @@ shinyUI(
                          sliderInput("fontSize", "Font size", min = 5, 
                                      max = 40, value = 12)
                        ),
-                       uiOutput("gene_graph_tab_conf", style = "margin-top: 50px;"),
+                       uiOutput("gene_graph_tab_conf", style = "margin-top: 80px;"),
                 ),
                 column(6, 
-                       div(style = "margin-top:105px;", 
+                       div(style = "margin-top:50px;", 
                          conditionalPanel(
                            class = "no-border-bg",
                            condition = "output.visualize_conf != null",

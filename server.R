@@ -91,14 +91,18 @@ server <- function(input, output, session) {
       tagList(
         div(style = "align-items: center;", 
             fileInput("dataFile_surv", 
-                      label = span("Genotype ", 
+                      label = span("", 
                                    tags$i(id = "helpIcon", 
                                           class = "fa fa-question-nitro", 
                                           style="margin-left: 5px;"))),
             bsTooltip(id = "helpIcon", 
                       title = "Select the file containing the information about the sample taken and its CCF.", 
                       placement = "right", trigger = "hover"),
-            actionButton("loadBtn_surv", "Load", class = "custom-button", style = "margin-top: -25px;")
+            actionButton("loadBtn_surv", "Load", class = "custom-button", 
+                         style = "margin-top: -25px;"),
+            bsTooltip(id = "loadBtn_surv", 
+                      title = "Load to view and edit the selected file.", 
+                      placement = "right", trigger = "hover")
         )
       )
     }
@@ -237,9 +241,16 @@ server <- function(input, output, session) {
     updateCheckboxInput(session, "load_file", value = FALSE)
     output$dataTable_GenotypeSurv <- NULL
     output$dataTable_surv <- NULL
+    output$heatmap_surv <- NULL
+    output$heatmap_GenotypeSurv <- NULL
+    output$survPlot2 <- NULL
     app_activated_surv(FALSE)
     conf_res(NULL)
     resampling_res(NULL)
+    genotype_table_surv(FALSE)
+    orig_genotypeSurv(NULL)
+    orig_dataSurv(NULL)
+    evo_step(NULL)
   }
   
   # Resets values when loading a new project
@@ -257,6 +268,7 @@ server <- function(input, output, session) {
     output$dataTable2 <- NULL
     output$loadBtn2 <- renderUI(NULL)
     output$directoryInput <- renderUI(NULL)
+    updateSelectInput(session, "data_type", selected = "Select data type")
   }
   
   # Resets values when loading a genotype file
@@ -668,7 +680,7 @@ server <- function(input, output, session) {
             tags$i(id = "helpIconFolder", class = "fa fa-question-circle", 
                    style="cursor: pointer;", `data-toggle`="tooltip", 
                    `data-placement`="right",
-                   title="To perform the inference operation, it's necessary to select the folder containing the files corresponding to each row of the database along with its respective Directed Acyclic Graph (DAG).")
+                   title = "Select the folder containing a file for each row, where each file corresponds to an adjacency matrix.")
         )
       )
     })
@@ -1011,6 +1023,7 @@ server <- function(input, output, session) {
       p <- p %>% layout(
         title = list(text = "Kaplan Meier estimates", font = list(size = 17), x = 0.5, xanchor = "center" ),
         legend = list(orientation = "h", x = 0.5, xanchor = "center", y = 1.05),
+        xaxis = list(title = "Time (months)", titlefont = list(size = 12)),
         annotations = list(
           list(
             text = "p<0.0001",
@@ -1028,7 +1041,9 @@ server <- function(input, output, session) {
       risk_table <- ggplotly(g$table)
       
       risk_table <- risk_table %>% layout(
-        title = list(text = "Risk table", font = list(size = 17), x = 0.5, xanchor = "center" )
+        title = list(text = "Risk table", font = list(size = 17), x = 0.5, xanchor = "center" ),
+        xaxis = list(title = "Time (months)", titlefont = list(size = 12)),
+        showlegend = FALSE
       )
       
       output$survPlot2 <- renderPlotly({risk_table})
@@ -1142,7 +1157,20 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$resetBtn, {
-    rv$dataFile=NULL
+    showModal(modalDialog(
+      title = "Conferma Reset",
+      "Sei sicuro di voler resettare tutto?",
+      easyClose = TRUE,
+      footer = tagList(
+        modalButton("Annulla"),
+        actionButton("confirmReset", "Conferma")
+      )
+    ))
+  })
+  
+  observeEvent(input$confirmReset, {
+    removeModal()
+    rv$dataFile <- NULL
     default_values_create_project()
     updateTabItems(session, "sidebarMenu", "input")
   })
@@ -1416,7 +1444,7 @@ server <- function(input, output, session) {
                     reg_sel(value)
                   } else if (parametro == "flag_surv") {
                     updateCheckboxInput(session, "load_file", 
-                                        value = as.logical(as.numeric(value)))
+                                        value = value)
                   } else if (parametro == "binarization_surv" & !(is.na(value))){
                     binarization_surv <- as.numeric(value)
                     output$binarization_surv <- renderUI({
@@ -1437,17 +1465,25 @@ server <- function(input, output, session) {
                     })
                     
                   }
-                  else if (parametro =="del_col_surv" & !(is.na(value))) {
-                    vettore <- unlist(strsplit(gsub("\"", "", value), ",\\s*"))
-                    del_col <- vettore[vettore != ""]
+                  else if (parametro =="del_col_surv") {
+                    if (is.na(value)) {
+                      del_col <- character(0)
+                    } else {
+                      vettore <- unlist(strsplit(gsub("\"", "", value), ",\\s*"))
+                      del_col <- vettore[vettore != ""]
+                    }
                     output$DeleteColumn_surv <- render_delete_column_ui("DeleteColumn_surv", 
                                                                    "Remove DNA alterations (column)", 
                                                                    orig_genotypeSurv(),
                                                                    selected_columns = del_col)
                     
-                  }else if (parametro =="del_row_surv" & !(is.na(value))) {
-                    vettore <- unlist(strsplit(gsub("\"", "", value), ",\\s*"))
-                    del_row <- vettore[vettore != ""]
+                  }else if (parametro =="del_row_surv") {
+                    if (is.na(value)) {
+                      del_row <- character(0)
+                    } else {
+                      vettore <- unlist(strsplit(gsub("\"", "", value), ",\\s*"))
+                      del_row <- vettore[vettore != ""]
+                    }
                     output$DeleteRow_surv <- render_delete_row_ui("DeleteRow_surv", 
                                                              "Remove samples (row)", 
                                                              orig_genotypeSurv(),
@@ -1472,46 +1508,47 @@ server <- function(input, output, session) {
                     case_surv("bulk_multiple")
                   } else if (parametro == "binarization_surv2" & !(is.na(value))){
                     binarization_surv2 <- as.numeric(value)
+
                     output$binarization_surv2 <- renderUI({
                       tagList(
                         div(style = "display: flex; align-items: center;",
                             numericInput("binarization_surv2", 
                                          label = span("Percentage threshold ", 
-                                                      tags$i(id = "helpIcon3", 
+                                                      tags$i(id = "helpIcon6", 
                                                              class = "fa fa-question-circle", 
                                                              style="margin-left: 5px;")), 
                                          value = binarization_surv2, min = 0, max = 1, 
                                          step = 0.01),
-                            bsTooltip(id = "helpIcon3", 
+                            bsTooltip(id = "helpIcon6", 
                                       title = "Specify  the percentage of presence that each step must have.", 
                                       placement = "right", trigger = "hover")
                         )
                       )
                     })
-                    
+
                   } else if (parametro =="del_col_surv2") {
                     if (is.na(value)) {
-                      del_col <- character(0)
+                      del_col2 <- character(0)
                     } else {
                       vettore <- unlist(strsplit(gsub("\"", "", value), ",\\s*"))
-                      del_col <- vettore[vettore != ""]
+                      del_col2 <- vettore[vettore != ""]
                     }
                   output$DeleteColumn_surv2 <- render_delete_column_ui("DeleteColumn_surv2", 
                                                                       "Remove evolutionary step (column)", 
                                                                       orig_dataSurv(),
-                                                                      selected_columns = del_col)
+                                                                      selected_columns = del_col2)
                   
                 }else if (parametro =="del_row_surv2") {
                   if (is.na(value)) {
-                    del_row <- character(0)
+                    del_row2 <- character(0)
                   } else {
                     vettore <- unlist(strsplit(gsub("\"", "", value), ",\\s*"))
-                    del_row <- vettore[vettore != ""]
+                    del_row2 <- vettore[vettore != ""]
                   }
                   output$DeleteRow_surv2 <- render_delete_row_ui("DeleteRow_surv2", 
                                                                 "Remove samples (row)", 
                                                                 orig_dataSurv(),
-                                                                selected_rows = del_row)
+                                                                selected_rows = del_row2)
                 }
                 }
               }
@@ -2177,10 +2214,16 @@ server <- function(input, output, session) {
             nodes <- as_tibble(get.vertex.attribute(grafo))
             colnames(nodes) <- "id"
             nodes <- data.frame(nodes, label= nodes$id)
-            edges <- as_tibble(as_edgelist(grafo))
-            colnames(edges) <- c("from", "to")
             
-            generateVisNetwork(nodes, edges, "other", "")
+            if (nrow(nodes) != 0) {
+              edges <- as_tibble(as_edgelist(grafo))
+              colnames(edges) <- c("from", "to")
+              
+              generateVisNetwork(nodes, edges, "other", "")
+            } else {
+              showNotification("No DAG available", type = "message")
+              output$graph_inference <- NULL
+            }
           })
         }
       }
@@ -2337,6 +2380,7 @@ server <- function(input, output, session) {
           reactive_selected_result_conf(selected_result)
           grafo <- graph_from_adjacency_matrix(selected_result)
           poset <- if (!is.null(res$poset)) res$poset else NULL
+          
           output$graph_conf <- renderVisNetwork({
             nodi_da_rimuovere <- V(grafo)[degree(grafo, mode = "in") == 0 & 
                                             degree(grafo, mode = "out") == 0]
@@ -2344,10 +2388,15 @@ server <- function(input, output, session) {
             nodes <- as_tibble(get.vertex.attribute(grafo))
             colnames(nodes) <- "id"
             nodes <- data.frame(nodes, label= nodes$id)
-            edges <- as_tibble(as_edgelist(grafo))
-            colnames(edges) <- c("from", "to")
-            
-            generateVisNetwork(nodes, edges, "other", "", poset)
+            if (nrow(nodes) != 0) {
+              edges <- as_tibble(as_edgelist(grafo))
+              colnames(edges) <- c("from", "to")
+              
+              generateVisNetwork(nodes, edges, "other", "", poset)
+            } else {
+              showNotification("No DAG available", type = "message")
+              output$graph_conf <- NULL
+            }
           })
         }
       }
@@ -2504,54 +2553,54 @@ server <- function(input, output, session) {
         output_db <- output_db[rownames(output_db) %in% common_samples, ]
         surv_data <- surv_data[surv_data$SAMPLE %in% common_samples, ]
         surv_data(surv_data)
-
         # Checking for all-zero or all-one columns
         all_zero_one <- apply(output_db, 2, function(col) all(col == 0) || all(col == 1))
         if (any(all_zero_one)) {
           removed_cols <- colnames(output_db)[which(all_zero_one)]
           output_db <- output_db[, !all_zero_one]
         }
-        
-        if (ncol(output_db) == 0) {
+        output_db <- data.frame(output_db)
+
+        if (ncol(output_db) < 2) {
           showNotification("No valid evolutionary step found", type = "message")
           return()
         }
-
-        output$dataTable_surv <- renderDT({
-          datatable(output_db, options = list(scrollX = TRUE), 
-                    selection = "single")
-        })
-        
-        output$heatmap_surv <- renderUI({
-          generate_heatmap_plot(output_db)
-        })
-        
-        evo_step(output_db)
-        
-        output$binarization_surv2 <- renderUI({
-          tagList(
-            div(style = "display: flex; align-items: center;",
-                numericInput("binarization_surv2", 
-                             label = span("Percentage threshold ", 
-                                          tags$i(id = "helpBinarization_surv2", 
-                                                 class = "fa fa-question-circle", 
-                                                 style="margin-left: 5px;")), 
-                             value = 0.00, min = 0, max = 1, 
-                             step = 0.01),
-                bsTooltip(id = "helpBinarization_surv2", 
-                          title = "Specify  the percentage of presence that each step must have.", 
-                          placement = "right", trigger = "hover")
+        else {
+          output$dataTable_surv <- renderDT({
+            datatable(output_db, options = list(scrollX = TRUE), 
+                      selection = "single")
+          })
+          output$heatmap_surv <- renderUI({
+            generate_heatmap_plot(output_db)
+          })
+          
+          evo_step(output_db)
+          
+          output$binarization_surv2 <- renderUI({
+            tagList(
+              div(style = "display: flex; align-items: center;",
+                  numericInput("binarization_surv2", 
+                               label = span("Percentage threshold ", 
+                                            tags$i(id = "helpBinarization_surv2", 
+                                                   class = "fa fa-question-circle", 
+                                                   style="margin-left: 5px;")), 
+                               value = 0.00, min = 0, max = 1, 
+                               step = 0.01),
+                  bsTooltip(id = "helpBinarization_surv2", 
+                            title = "Specify  the percentage of presence that each step must have.", 
+                            placement = "right", trigger = "hover")
+              )
             )
-          )
-        })
-        
-        output$DeleteColumn_surv2 <- render_delete_column_ui("DeleteColumn_surv2", 
-                                                            "Remove evolutionary step (column)", 
-                                                            output_db)
-        output$DeleteRow_surv2 <- render_delete_row_ui("DeleteRow_surv2", 
-                                                      "Remove samples (row)", 
-                                                      output_db)
-        orig_dataSurv(output_db)
+          })
+          
+          output$DeleteColumn_surv2 <- render_delete_column_ui("DeleteColumn_surv2", 
+                                                              "Remove evolutionary step (column)", 
+                                                              output_db)
+          output$DeleteRow_surv2 <- render_delete_row_ui("DeleteRow_surv2", 
+                                                        "Remove samples (row)", 
+                                                        output_db)
+          orig_dataSurv(output_db)
+        }
       } else {
         showNotification("No DAG available with this regularizer", type = "error")
       }
@@ -2583,6 +2632,7 @@ server <- function(input, output, session) {
   observeEvent(input$loadBtn_surv, {
     inFile2 <- input$dataFile_surv
     output$dataTable_surv <- NULL
+    output$heatmap_surv <- NULL
     
     if (is.null(inFile2)) {
       showNotification("Please select a file", type = "error")
@@ -2800,21 +2850,18 @@ server <- function(input, output, session) {
   # Calculation of survival output using ASCETIC function 'evoSigs'
   observeEvent(input$calc_surv, {
     if(is.null(evo_step())) {
-      showNotification("Calculate the evolutionary step first", type = "message")
+      showNotification("Calculate the previous step first", type = "message")
     } else {
       if (!is.na(input$binarization_surv2) & input$binarization_surv2 != 0 ) {
         data <- evo_step()
         threshold <- input$binarization_surv2
-        print(input$binarization_surv2)
-        print(data)
         cols_to_remove <- sapply(data, function(column) {
           mean(column == 1) < threshold
         })
-        print(cols_to_remove)
         filtered_evoStep <- data[, !cols_to_remove, FALSE]
-        print(ncol(filtered_evoStep))
+      } else if (input$binarization_surv2 == 0){
+        filtered_evoStep <- evo_step()
       }
-      
       if (ncol(filtered_evoStep) < 1) {
         showNotification("There are no evolutionary steps with this percentage of presence", type = "warning")
       } else {
@@ -2878,21 +2925,24 @@ server <- function(input, output, session) {
       }
 
       
-      if ((!is.null(case_surv())) && case_surv() == "bulk_multiple") {
-        values <- c("binarization", "del_col", "del_row", "flag_resampling", 
-                    "nresampling", "restarts", "regularization", "command", 
-                    "seed", "iteration", "flag_confidence", "nresampling_confidence",  
-                    "reg_surv", "flag_surv", "binarization_surv", "del_col_surv", 
-                    "del_row_surv", "data_type", "data_type_surv", 
-                    "binarization_surv2", "del_col_surv2", "del_row_surv2", "binarizationPerc_surv")
-      } else {
-        values <- c("binarization", "del_col", "del_row", "flag_resampling", 
-                    "nresampling", "restarts", "regularization", "command", 
-                    "seed", "iteration", "flag_confidence", "nresampling_confidence",  
-                    "reg_surv", "flag_surv", "binarization_surv", "del_col_surv", 
-                    "del_row_surv", "data_type", "data_type_surv", 
-                    "binarization_surv2", "del_col_surv2", "del_row_surv2")
+      values <- c("binarization", "del_col", "del_row", "flag_resampling", 
+                "nresampling", "restarts", "regularization", "command", 
+                "seed", "iteration", "flag_confidence", "nresampling_confidence",  
+                "reg_surv", "flag_surv", "binarization_surv", "data_type", "data_type_surv", 
+                "binarization_surv2")
+      
+      if (!is.null(case_surv()) && case_surv() == "bulk_multiple") {
+        values <- c(values, "binarizationPerc_surv")
       }
+      
+      if (!is.null(orig_genotypeSurv())) {
+        values <- c(values, "del_col_surv", "del_row_surv")
+      }
+      
+      if (!is.null(evo_step())) {
+        values <- c(values, "del_col_surv2", "del_row_surv2")
+      }
+      
       sequence <- ifelse((!is.null(input$binarization)), input$binarization, NA)
       sequence <- c(sequence, ifelse((!is.null(input$DeleteColumn)), 
                                      toString(input$DeleteColumn), NA))
@@ -2909,41 +2959,41 @@ server <- function(input, output, session) {
       sequence <- c(sequence, ifelse((!is.null(input$command)), 
                                      input$command, NA))
       sequence <- c(sequence, ifelse((!is.null(input$seed)), input$seed, NA))
-      
       sequence <- c(sequence, ifelse((!is.null(input$iteration_confEstimation)), 
                                      input$iteration_confEstimation, NA))
-      
       sequence <- c(sequence, ifelse((!is.null(input$resamplingFlag_conf)), 
                                      input$resamplingFlag_conf, NA))
       sequence <- c(sequence, ifelse((!is.null(input$nresampling_conf)), 
                                      input$nresampling_conf, NA))
       sequence <- c(sequence, ifelse((!is.null(input$regularization_surv)), 
                                      input$regularization_surv, NA))
-      
       sequence <- c(sequence, ifelse((!is.null(input$load_file)), 
                                      input$load_file, NA))
       sequence <- c(sequence, ifelse((!is.null(input$binarization_surv)), 
                                      toString(input$binarization_surv), NA))
-      sequence <- c(sequence, ifelse((!is.null(input$DeleteColumn_surv)), 
-                                     toString(input$DeleteColumn_surv), NA))
-      sequence <- c(sequence, ifelse((!is.null(input$DeleteRow_surv)), 
-                                     toString(input$DeleteRow_surv), NA))
       sequence <- c(sequence, ifelse((!is.null(input$data_type)), 
                                      toString(input$data_type), NA))
       sequence <- c(sequence, ifelse((!is.null(input$data_type_surv)), 
                                      toString(input$data_type_surv), NA))
       sequence <- c(sequence, ifelse((!is.null(input$binarization_surv2)), 
                                      toString(input$binarization_surv2), NA))
-      sequence <- c(sequence, ifelse((!is.null(input$DeleteColumn_surv2)), 
-                                     toString(input$DeleteColumn_surv2), NA))
-      sequence <- c(sequence, ifelse((!is.null(input$DeleteRow_surv2)), 
-                                     toString(input$DeleteRow_surv2), NA))
       if ((!is.null(case_surv())) && case_surv() == "bulk_multiple") {
         sequence <- c(sequence, ifelse((!is.null(input$binarization_percSurv)), 
                                        toString(input$binarization_percSurv), NA))
       }
-      
-      
+      if (!is.null(orig_genotypeSurv())) {
+        sequence <- c(sequence, ifelse((!is.null(input$DeleteColumn_surv)), 
+                                       toString(input$DeleteColumn_surv), NA))
+        sequence <- c(sequence, ifelse((!is.null(input$DeleteRow_surv)), 
+                                       toString(input$DeleteRow_surv), NA))
+      }
+      if (!is.null(evo_step())) {
+        sequence <- c(sequence, ifelse((!is.null(input$DeleteColumn_surv2)), 
+                                       toString(input$DeleteColumn_surv2), NA))
+        sequence <- c(sequence, ifelse((!is.null(input$DeleteRow_surv2)), 
+                                       toString(input$DeleteRow_surv2), NA))
+      }
+
       matrix_data <- matrix(data = c(values, sequence),
                             nrow = length(values),
                             ncol = 2,
