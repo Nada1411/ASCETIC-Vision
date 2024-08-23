@@ -3,7 +3,7 @@ source("libraries.R")
 shinyUI(
   dashboardPage(
     dashboardHeader(
-      title = HTML("ASCETIC <i>plus</i>"),
+      title = HTML("ASCETIC-<i>Vision</i>"),
       tags$li(class = "dropdown", 
               style = "display: flex; justify-content: center; 
           align-items: center; color: #222D32; font-size: 15px;
@@ -501,6 +501,8 @@ shinyUI(
                   style = "width: 75%; margin: 0 auto;",
                   tags$br(),
                   plotlyOutput("survPlot2", width = "100%", height = "200px"),
+                  tags$br(),
+                  plotlyOutput("survPlot3", width = "100%", height = "200px"),
             )
           )
         ),
