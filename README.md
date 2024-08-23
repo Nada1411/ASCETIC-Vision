@@ -1,6 +1,6 @@
 # ASCETIC-Vision
 
-ASCETIC-Vision is a dashboard built using the Shiny package in R. It is designed to facilitate the analysis of cancer evolutionary signatures and patient stratification within the ASCETIC framework.
+ASCETIC-Vision is a dashboard built using the Shiny package in R. It is designed to facilitate the analysis of cancer evolutionary signatures and patient stratification performed by ASCETIC framework.
 
 ## Dashboard Sections
 
