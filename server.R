@@ -2866,12 +2866,12 @@ server <- function(input, output, session) {
         showNotification("There are no evolutionary steps with this percentage of presence", type = "warning")
       } else {
       
-        #resExampleEvosigs <- evoSigs( survivalData = surv_data(),
-        #                              evolutionarySteps = filtered_evoStep 
-        #                              )
-        data(amlExample)
-        resExampleEvosigs <- evoSigs( survivalData = amlExample$survival_data,
-                                      evolutionarySteps = amlExample$evolutionary_steps )
+        resExampleEvosigs <- evoSigs( survivalData = surv_data(),
+                                      evolutionarySteps = filtered_evoStep 
+                                      )
+        #data(amlExample)
+        #resExampleEvosigs <- evoSigs( survivalData = amlExample$survival_data,
+        #                              evolutionarySteps = amlExample$evolutionary_steps )
         
         resExampleEvosigs(resExampleEvosigs)
       
